@@ -67,6 +67,13 @@ async def require_admin(username: str = Depends(get_current_user), db: AsyncSess
     Returns the username if user is admin.
     Raises 403 if user is not admin.
     """
+    result = await db.execute(select(Settings).where(Settings.key == "auth_enabled"))
+    settings_row = result.scalar_one_or_none()
+    auth_enabled = settings_row and settings_row.value.lower() == "true"
+
+    if not auth_enabled:
+        return username
+
     result = await db.execute(select(Person).where(Person.username == username))
     person = result.scalar_one_or_none()
 

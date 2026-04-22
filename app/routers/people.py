@@ -18,7 +18,7 @@ async def list_people(current_user: str = Depends(get_current_user), db: AsyncSe
 
 
 @router.post("", response_model=PersonOut, status_code=201)
-async def create_person(body: PersonCreate, current_user: str = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def create_person(body: PersonCreate, current_user: str = Depends(require_admin), db: AsyncSession = Depends(get_db)):
     existing_name = await db.execute(select(Person).where(Person.name == body.name))
     if existing_name.scalar_one_or_none():
         raise HTTPException(status_code=409, detail="Person already exists")

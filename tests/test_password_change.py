@@ -4,7 +4,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from app.models import Person
+from app.models import Person, Settings
 from app.security import hash_password, verify_password
 
 
@@ -21,6 +21,7 @@ async def test_change_password_with_valid_old_password(client: AsyncClient, db: 
         is_admin=False
     )
     db.add(person)
+    db.add(Settings(key="auth_enabled", value="true"))
     await db.commit()
 
     # Login to get token

@@ -3,7 +3,7 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Person
+from app.models import Person, Settings
 from app.security import hash_password
 
 
@@ -43,6 +43,7 @@ async def test_normal_user_cannot_create_user(client: AsyncClient, db: AsyncSess
         is_admin=False
     )
     db.add(person)
+    db.add(Settings(key="auth_enabled", value="true"))
     await db.commit()
 
     # Normal user tries to create another user
@@ -98,6 +99,7 @@ async def test_normal_user_cannot_update_user(client: AsyncClient, db: AsyncSess
         is_admin=False
     )
     db.add(person)
+    db.add(Settings(key="auth_enabled", value="true"))
     await db.commit()
 
     # Create a user to update
@@ -162,6 +164,7 @@ async def test_normal_user_cannot_delete_user(client: AsyncClient, db: AsyncSess
         is_admin=False
     )
     db.add(person)
+    db.add(Settings(key="auth_enabled", value="true"))
     await db.commit()
 
     # Create a user to delete

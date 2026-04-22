@@ -4,7 +4,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from app.models import Person, TokenBlacklist
+from app.models import Person, Settings, TokenBlacklist
 from app.security import hash_password
 from app.routers.auth import _create_jwt_token
 
@@ -95,6 +95,9 @@ async def test_require_admin_with_admin_user(client: AsyncClient, db: AsyncSessi
     token = login_r.json()["access_token"]
     assert login_r.json()["user"]["is_admin"] is True
 
+    db.add(Settings(key="auth_enabled", value="true"))
+    await db.commit()
+
     # Admin user can change password (which requires being authenticated)
     change_r = await client.put(
         "/auth/password",
@@ -121,6 +124,7 @@ async def test_require_admin_with_normal_user(client: AsyncClient, db: AsyncSess
         is_admin=False
     )
     db.add(person)
+    db.add(Settings(key="auth_enabled", value="true"))
     await db.commit()
 
     # Login as normal user
