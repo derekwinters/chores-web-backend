@@ -4,6 +4,7 @@ import pytest
 
 from app.models import Chore, PointsLog
 from app.services.chore_service import (
+    apply_assignment_state,
     complete_chore,
     compute_age,
     compute_next_assignee,
@@ -72,6 +73,25 @@ class TestComputeNextAssignee:
     def test_non_rotating_returns_none(self):
         chore = _make_chore(assignment_type="open")
         assert compute_next_assignee(chore) is None
+
+
+class TestApplyAssignmentState:
+    def test_fixed_assignment_updates_current_assignee(self):
+        chore = _make_chore(assignment_type="fixed", assignee="Alice", current_assignee="Alice")
+        apply_assignment_state(chore, assignee="Bob")
+        assert chore.assignee == "Bob"
+        assert chore.current_assignee == "Bob"
+
+    def test_rotating_next_assignee_recomputes_current(self):
+        chore = _make_chore(
+            assignment_type="rotating",
+            eligible_people=["Alice", "Bob", "Carol"],
+            current_assignee="Alice",
+            rotation_index=0,
+        )
+        apply_assignment_state(chore, next_assignee="Alice")
+        assert chore.current_assignee == "Carol"
+        assert chore.rotation_index == 2
 
 
 class TestCompleteChore:

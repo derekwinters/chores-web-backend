@@ -20,6 +20,7 @@ from ..schemas import (
     SkipReassignBody,
 )
 from ..services.chore_service import (
+    apply_assignment_state,
     complete_chore,
     compute_age,
     compute_next_assignee,
@@ -77,6 +78,37 @@ async def _validate_people_exist(db: AsyncSession, people: list[str] | None, ass
         invalid = [p for p in people if p not in existing_names]
         if invalid:
             raise HTTPException(status_code=400, detail=f"People do not exist: {', '.join(invalid)}")
+
+
+def _validate_assignment_state(
+    *,
+    assignment_type: str,
+    eligible_people: list[str],
+    assignee: str | None,
+    current_assignee: str | None,
+    next_assignee: str | None,
+) -> None:
+    if assignment_type == "fixed":
+        if current_assignee and assignee and current_assignee != assignee:
+            raise HTTPException(status_code=400, detail="Fixed chores must have matching assignee and current_assignee")
+        return
+
+    if assignment_type == "rotating":
+        if not eligible_people:
+            raise HTTPException(status_code=400, detail="Rotating chores require eligible people")
+        if current_assignee and current_assignee not in eligible_people:
+            raise HTTPException(status_code=400, detail="Current assignee must be in eligible_people")
+        if next_assignee and next_assignee not in eligible_people:
+            raise HTTPException(status_code=400, detail="Next assignee must be in eligible_people")
+        if current_assignee and next_assignee:
+            current_idx = eligible_people.index(current_assignee)
+            expected_next = eligible_people[(current_idx + 1) % len(eligible_people)]
+            if expected_next != next_assignee:
+                raise HTTPException(status_code=400, detail="Next assignee must immediately follow current assignee in the rotation")
+        return
+
+    if next_assignee:
+        raise HTTPException(status_code=400, detail="Only rotating chores can set next_assignee")
 
 
 @router.get("", response_model=list[ChoreOut], summary="List all chores")
@@ -141,7 +173,30 @@ async def create_chore(body: ChoreCreate, current_user: str = Depends(get_curren
 async def update_chore(chore_id: int, body: ChoreUpdate, current_user: str = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     chore = await _get_or_404(chore_id, db)
     updates = body.model_dump(exclude_none=True)
-    await _validate_people_exist(db, updates.get("eligible_people"), updates.get("assignee"))
+    current_assignee = updates.pop("current_assignee", None)
+    next_assignee = updates.pop("next_assignee", None)
+    target_assignment_type = updates.get("assignment_type", chore.assignment_type)
+    target_eligible_people = updates.get("eligible_people", chore.eligible_people)
+    target_assignee = updates.get("assignee", chore.assignee)
+    target_current_assignee = current_assignee if current_assignee is not None else chore.current_assignee
+
+    if target_assignment_type == "fixed" and updates.get("assignee") is not None and current_assignee is None:
+        target_current_assignee = updates["assignee"]
+
+    people_to_validate = updates.get("eligible_people")
+    assignee_to_validate = updates.get("assignee")
+    extra_people = [name for name in [current_assignee, next_assignee] if name is not None]
+    if extra_people:
+        people_to_validate = list(dict.fromkeys((people_to_validate or []) + extra_people))
+
+    await _validate_people_exist(db, people_to_validate, assignee_to_validate)
+    _validate_assignment_state(
+        assignment_type=target_assignment_type,
+        eligible_people=target_eligible_people or [],
+        assignee=target_assignee,
+        current_assignee=target_current_assignee,
+        next_assignee=next_assignee,
+    )
 
     for field, value in updates.items():
         old_value = getattr(chore, field, None)
@@ -168,6 +223,45 @@ async def update_chore(chore_id: int, body: ChoreUpdate, current_user: str = Dep
             )
 
         setattr(chore, field, value)
+
+    if target_assignment_type == "fixed" and updates.get("assignee") is not None and current_assignee is None:
+        current_assignee = updates["assignee"]
+
+    if current_assignee is not None or next_assignee is not None or any(
+        key in updates for key in ("assignment_type", "eligible_people", "assignee")
+    ):
+        old_current = chore.current_assignee
+        old_next = compute_next_assignee(chore)
+        old_rotation_index = chore.rotation_index
+
+        apply_assignment_state(
+            chore,
+            assignment_type=target_assignment_type,
+            eligible_people=target_eligible_people,
+            assignee=target_assignee,
+            current_assignee=current_assignee,
+            next_assignee=next_assignee,
+        )
+
+        assignment_changes = []
+        if chore.current_assignee != old_current:
+            assignment_changes.append(("current_assignee", old_current, chore.current_assignee))
+        if compute_next_assignee(chore) != old_next:
+            assignment_changes.append(("next_assignee", old_next, compute_next_assignee(chore)))
+        if chore.rotation_index != old_rotation_index:
+            assignment_changes.append(("rotation_index", old_rotation_index, chore.rotation_index))
+
+        for field_name, old_value, new_value in assignment_changes:
+            await log_chore_change(
+                chore_id=chore.id,
+                chore_name=chore.name,
+                action="updated",
+                person=current_user,
+                db=db,
+                field_name=field_name,
+                old_value=None if old_value is None else str(old_value),
+                new_value=None if new_value is None else str(new_value),
+            )
 
     db.add(chore)
     await db.commit()

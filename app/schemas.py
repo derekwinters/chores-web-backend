@@ -92,6 +92,8 @@ class ChoreUpdate(BaseModel):
     assignment_type: Optional[str] = None
     eligible_people: Optional[list[str]] = None
     assignee: Optional[str] = None
+    current_assignee: Optional[str] = None
+    next_assignee: Optional[str] = None
     points: Optional[int] = None
     disabled: Optional[bool] = None
     next_due: Optional[date] = None

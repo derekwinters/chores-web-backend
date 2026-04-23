@@ -134,6 +134,57 @@ class TestChoresAPI:
         assert r.json()["points"] == 10
 
     @pytest.mark.asyncio
+    async def test_update_fixed_assignee_updates_current_assignee(self, authenticated_client):
+        await authenticated_client.post("/people", json={"name": "Alice", "username": "alice"})
+        await authenticated_client.post("/people", json={"name": "Bob", "username": "bob"})
+        create_r = await authenticated_client.post(
+            "/chores",
+            json={
+                "name": "Feed cat",
+                "schedule_type": "weekly",
+                "schedule_config": {"days": [0]},
+                "assignment_type": "fixed",
+                "assignee": "Alice",
+                "points": 1,
+            },
+        )
+        chore_id = create_r.json()["id"]
+
+        r = await authenticated_client.put(f"/chores/{chore_id}", json={"assignee": "Bob"})
+        assert r.status_code == 200
+        data = r.json()
+        assert data["assignee"] == "Bob"
+        assert data["current_assignee"] == "Bob"
+
+    @pytest.mark.asyncio
+    async def test_update_rotating_current_and_next_assignee(self, authenticated_client):
+        await authenticated_client.post("/people", json={"name": "Alice", "username": "alice"})
+        await authenticated_client.post("/people", json={"name": "Bob", "username": "bob"})
+        await authenticated_client.post("/people", json={"name": "Carol", "username": "carol"})
+        create_r = await authenticated_client.post(
+            "/chores",
+            json={
+                "name": "Laundry",
+                "schedule_type": "interval",
+                "schedule_config": {"days": 3},
+                "assignment_type": "rotating",
+                "eligible_people": ["Alice", "Bob", "Carol"],
+                "points": 2,
+            },
+        )
+        chore_id = create_r.json()["id"]
+
+        r = await authenticated_client.put(
+            f"/chores/{chore_id}",
+            json={"current_assignee": "Bob", "next_assignee": "Carol"},
+        )
+        assert r.status_code == 200
+        data = r.json()
+        assert data["current_assignee"] == "Bob"
+        assert data["next_assignee"] == "Carol"
+        assert data["rotation_index"] == 1
+
+    @pytest.mark.asyncio
     async def test_delete_chore(self, authenticated_client):
         create_r = await authenticated_client.post("/chores", json=WEEKLY_CHORE)
         chore_id = create_r.json()["id"]

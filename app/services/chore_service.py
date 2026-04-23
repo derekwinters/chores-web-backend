@@ -49,6 +49,64 @@ def compute_next_assignee(chore: Chore) -> Optional[str]:
     return chore.eligible_people[next_idx]
 
 
+def apply_assignment_state(
+    chore: Chore,
+    *,
+    assignment_type: Optional[str] = None,
+    eligible_people: Optional[list[str]] = None,
+    assignee: Optional[str] = None,
+    current_assignee: Optional[str] = None,
+    next_assignee: Optional[str] = None,
+) -> None:
+    target_assignment_type = assignment_type or chore.assignment_type
+    target_eligible_people = eligible_people if eligible_people is not None else list(chore.eligible_people or [])
+    target_assignee = assignee if assignee is not None else chore.assignee
+    target_current_assignee = current_assignee if current_assignee is not None else chore.current_assignee
+
+    if target_assignment_type == "fixed":
+        fixed_assignee = target_assignee or target_current_assignee
+        chore.assignee = fixed_assignee
+        chore.current_assignee = fixed_assignee
+        chore.rotation_index = 0
+        return
+
+    chore.assignee = target_assignee if target_assignment_type == "fixed" else None
+
+    if target_assignment_type == "rotating":
+        if not target_eligible_people:
+            chore.current_assignee = None
+            chore.rotation_index = 0
+            return
+
+        if current_assignee is not None and next_assignee is not None:
+            chore.rotation_index = target_eligible_people.index(target_current_assignee)
+            chore.current_assignee = target_current_assignee
+            return
+
+        if current_assignee is not None:
+            chore.rotation_index = target_eligible_people.index(target_current_assignee)
+            chore.current_assignee = target_current_assignee
+            return
+
+        if next_assignee is not None:
+            next_idx = target_eligible_people.index(next_assignee)
+            chore.rotation_index = (next_idx - 1) % len(target_eligible_people)
+            chore.current_assignee = target_eligible_people[chore.rotation_index]
+            return
+
+        if chore.current_assignee in target_eligible_people:
+            chore.rotation_index = target_eligible_people.index(chore.current_assignee)
+            return
+
+        current_idx = min(chore.rotation_index, len(target_eligible_people) - 1)
+        chore.rotation_index = max(current_idx, 0)
+        chore.current_assignee = target_eligible_people[chore.rotation_index]
+        return
+
+    chore.rotation_index = 0
+    chore.current_assignee = target_current_assignee
+
+
 def _calc_next_due(chore: Chore, from_date: Optional[date] = None) -> Optional[date]:
     config = dict(chore.schedule_config)
     config["type"] = chore.schedule_type
