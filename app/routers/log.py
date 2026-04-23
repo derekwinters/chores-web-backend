@@ -24,6 +24,7 @@ async def get_log(
     person: Optional[str] = Query(None),
     chore_id: Optional[str] = Query(None),
     action: Optional[str] = Query(None),
+    actions: Optional[list[str]] = Query(None),
     start_date: Optional[date] = Query(None),
     end_date: Optional[date] = Query(None),
     current_user: str = Depends(get_current_user),
@@ -37,6 +38,8 @@ async def get_log(
         query = query.where(ChoreLog.chore_id == int(chore_id))
     if action:
         query = query.where(ChoreLog.action == action)
+    if actions:
+        query = query.where(ChoreLog.action.in_(actions))
     if start_date:
         query = query.where(ChoreLog.timestamp >= datetime.combine(start_date, datetime.min.time()))
     if end_date:

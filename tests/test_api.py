@@ -360,3 +360,30 @@ class TestPointsAPI:
         r = await authenticated_client.get("/health")
         assert r.status_code == 200
         assert r.json() == {"status": "ok"}
+
+
+class TestLogAPI:
+    @pytest.mark.asyncio
+    async def test_log_filters_multiple_actions(self, authenticated_client):
+        await authenticated_client.post("/people", json={"name": "Alice", "username": "alice"})
+        await authenticated_client.post("/people", json={"name": "Bob", "username": "bob"})
+        r = await authenticated_client.post("/chores", json=ROTATING_CHORE)
+        chore_id = r.json()["id"]
+
+        await authenticated_client.post(f"/chores/{chore_id}/mark-due")
+        await authenticated_client.post(f"/chores/{chore_id}/complete", json={"completed_by": "Alice"})
+        await authenticated_client.post(f"/chores/{chore_id}/reassign", json={"assignee": "Bob"})
+        await authenticated_client.put(f"/chores/{chore_id}", json={"points": 9})
+
+        r = await authenticated_client.get("/log?person=Alice&actions=completed&actions=reassigned")
+        assert r.status_code == 200
+        actions = [entry["action"] for entry in r.json()]
+        assert "completed" in actions
+        assert "reassigned" not in actions
+
+        r = await authenticated_client.get("/log?actions=completed&actions=reassigned")
+        assert r.status_code == 200
+        actions = [entry["action"] for entry in r.json()]
+        assert "completed" in actions
+        assert "reassigned" in actions
+        assert "updated" not in actions
