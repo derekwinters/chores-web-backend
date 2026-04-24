@@ -30,6 +30,7 @@ from ..services.chore_service import (
     reassign_chore,
     skip_and_reassign_chore,
     skip_chore,
+    validate_assignment,
 )
 from ..services.logging import log_chore_change
 from ..dependencies import get_current_user
@@ -142,6 +143,11 @@ async def get_chore(
 async def create_chore(body: ChoreCreate, current_user: str = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     await _validate_people_exist(db, body.eligible_people, body.assignee)
 
+    # Validate assignment configuration
+    validation_errors = validate_assignment(body.model_dump())
+    if validation_errors:
+        raise HTTPException(status_code=400, detail=validation_errors)
+
     # Check for duplicate chore name
     existing = await db.execute(select(Chore).where(Chore.name == body.name))
     if existing.scalar_one_or_none():
@@ -190,6 +196,18 @@ async def update_chore(chore_id: int, body: ChoreUpdate, current_user: str = Dep
         people_to_validate = list(dict.fromkeys((people_to_validate or []) + extra_people))
 
     await _validate_people_exist(db, people_to_validate, assignee_to_validate)
+
+    # Validate assignment configuration
+    validation_errors = validate_assignment({
+        "assignment_type": target_assignment_type,
+        "eligible_people": target_eligible_people or [],
+        "assignee": target_assignee,
+        "current_assignee": target_current_assignee,
+        "next_assignee": next_assignee,
+    })
+    if validation_errors:
+        raise HTTPException(status_code=400, detail=validation_errors)
+
     _validate_assignment_state(
         assignment_type=target_assignment_type,
         eligible_people=target_eligible_people or [],

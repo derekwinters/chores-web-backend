@@ -89,6 +89,14 @@ class TestValidateAssignment:
         )
         assert validate_assignment(chore) is None
 
+    def test_fixed_assignment_valid_on_creation(self):
+        chore = _make_chore(
+            assignment_type="fixed",
+            assignee="Alice",
+            current_assignee=None,
+        )
+        assert validate_assignment(chore) is None
+
     def test_fixed_assignment_mismatched_current(self):
         chore = _make_chore(
             assignment_type="fixed",

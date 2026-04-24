@@ -53,7 +53,7 @@ def validate_assignment(chore) -> Optional[dict[str, str]]:
     if assignment_type == "fixed":
         if not assignee:
             errors["assignee"] = "Fixed assignment requires an assignee"
-        elif current_assignee != assignee:
+        elif current_assignee is not None and current_assignee != assignee:
             errors["current_assignee"] = f"Must be assigned to {assignee} for fixed assignment"
 
     elif assignment_type == "rotating":
