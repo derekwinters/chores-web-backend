@@ -27,6 +27,47 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def validate_assignment(chore) -> Optional[dict[str, str]]:
+    """Validate chore assignment configuration.
+
+    Returns None if valid, dict of field->error message if invalid.
+    """
+    if isinstance(chore, dict):
+        assignment_type = chore.get('assignment_type')
+        current_assignee = chore.get('current_assignee')
+        assignee = chore.get('assignee')
+        eligible_people = chore.get('eligible_people') or []
+        next_assignee = chore.get('next_assignee')
+    else:
+        assignment_type = chore.assignment_type
+        current_assignee = chore.current_assignee
+        assignee = chore.assignee
+        eligible_people = chore.eligible_people or []
+        next_assignee = getattr(chore, 'next_assignee', None)
+
+    if assignment_type == "open":
+        return None
+
+    errors = {}
+
+    if assignment_type == "fixed":
+        if not assignee:
+            errors["assignee"] = "Fixed assignment requires an assignee"
+        elif current_assignee != assignee:
+            errors["current_assignee"] = f"Must be assigned to {assignee} for fixed assignment"
+
+    elif assignment_type == "rotating":
+        if not eligible_people:
+            errors["eligible_people"] = "Rotating assignment requires at least one eligible person"
+        else:
+            if current_assignee and current_assignee not in eligible_people:
+                errors["current_assignee"] = "Not in eligible people list"
+            if next_assignee and next_assignee not in eligible_people:
+                errors["next_assignee"] = "Not in eligible people list"
+
+    return errors if errors else None
+
+
 def compute_age(chore: Chore) -> Optional[int]:
     if chore.next_due is None:
         return None

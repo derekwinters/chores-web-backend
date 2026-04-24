@@ -14,6 +14,7 @@ from app.services.chore_service import (
     skip_and_reassign_chore,
     skip_chore,
     transition_overdue_chores,
+    validate_assignment,
 )
 
 
@@ -73,6 +74,112 @@ class TestComputeNextAssignee:
     def test_non_rotating_returns_none(self):
         chore = _make_chore(assignment_type="open")
         assert compute_next_assignee(chore) is None
+
+
+class TestValidateAssignment:
+    def test_open_assignment_always_valid(self):
+        chore = _make_chore(assignment_type="open")
+        assert validate_assignment(chore) is None
+
+    def test_fixed_assignment_valid(self):
+        chore = _make_chore(
+            assignment_type="fixed",
+            assignee="Alice",
+            current_assignee="Alice",
+        )
+        assert validate_assignment(chore) is None
+
+    def test_fixed_assignment_mismatched_current(self):
+        chore = _make_chore(
+            assignment_type="fixed",
+            assignee="Alice",
+            current_assignee="Bob",
+        )
+        errors = validate_assignment(chore)
+        assert errors is not None
+        assert "current_assignee" in errors
+
+    def test_fixed_assignment_missing_assignee(self):
+        chore = _make_chore(
+            assignment_type="fixed",
+            assignee=None,
+            current_assignee="Alice",
+        )
+        errors = validate_assignment(chore)
+        assert errors is not None
+        assert "assignee" in errors
+
+    def test_rotating_assignment_valid(self):
+        chore = _make_chore(
+            assignment_type="rotating",
+            eligible_people=["Alice", "Bob", "Carol"],
+            current_assignee="Alice",
+        )
+        assert validate_assignment(chore) is None
+
+    def test_rotating_assignment_invalid_current(self):
+        chore = _make_chore(
+            assignment_type="rotating",
+            eligible_people=["Alice", "Bob"],
+            current_assignee="Carol",
+        )
+        errors = validate_assignment(chore)
+        assert errors is not None
+        assert "current_assignee" in errors
+
+    def test_rotating_assignment_invalid_next(self):
+        chore = _make_chore(
+            assignment_type="rotating",
+            eligible_people=["Alice", "Bob"],
+            current_assignee="Alice",
+        )
+        # Add next_assignee to dict representation for validation
+        errors = validate_assignment({
+            "assignment_type": "rotating",
+            "eligible_people": ["Alice", "Bob"],
+            "current_assignee": "Alice",
+            "next_assignee": "Carol",
+        })
+        assert errors is not None
+        assert "next_assignee" in errors
+
+    def test_rotating_assignment_empty_eligible(self):
+        chore = _make_chore(
+            assignment_type="rotating",
+            eligible_people=[],
+            current_assignee=None,
+        )
+        errors = validate_assignment(chore)
+        assert errors is not None
+        assert "eligible_people" in errors
+
+    def test_rotating_assignment_null_current_assignee(self):
+        chore = _make_chore(
+            assignment_type="rotating",
+            eligible_people=["Alice", "Bob"],
+            current_assignee=None,
+        )
+        assert validate_assignment(chore) is None
+
+    def test_works_with_dict(self):
+        chore_dict = {
+            "assignment_type": "fixed",
+            "assignee": "Alice",
+            "current_assignee": "Alice",
+            "eligible_people": [],
+        }
+        assert validate_assignment(chore_dict) is None
+
+    def test_dict_invalid_fixed(self):
+        chore_dict = {
+            "assignment_type": "fixed",
+            "assignee": "Alice",
+            "current_assignee": "Bob",
+            "eligible_people": [],
+        }
+        errors = validate_assignment(chore_dict)
+        assert errors is not None
+        assert "current_assignee" in errors
 
 
 class TestApplyAssignmentState:
