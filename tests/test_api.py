@@ -185,6 +185,112 @@ class TestChoresAPI:
         assert data["rotation_index"] == 1
 
     @pytest.mark.asyncio
+    async def test_update_next_due_from_past_to_future_resets_state_to_complete(self, authenticated_client):
+        from datetime import date, timedelta
+
+        # Create a chore (will have next_due calculated from schedule)
+        create_r = await authenticated_client.post("/chores", json=WEEKLY_CHORE)
+        chore_id = create_r.json()["id"]
+        initial_state = create_r.json()["state"]
+
+        # Update next_due to a past date (should set state to "due")
+        past_date = (date.today() - timedelta(days=1)).isoformat()
+        r = await authenticated_client.put(f"/chores/{chore_id}", json={"next_due": past_date})
+        assert r.status_code == 200
+        assert r.json()["state"] == "due"
+        assert r.json()["next_due"] == past_date
+
+        # Update next_due to a future date (should reset state to "complete")
+        future_date = (date.today() + timedelta(days=5)).isoformat()
+        r = await authenticated_client.put(f"/chores/{chore_id}", json={"next_due": future_date})
+        assert r.status_code == 200
+        assert r.json()["state"] == "complete"
+        assert r.json()["next_due"] == future_date
+
+    @pytest.mark.asyncio
+    async def test_update_next_due_to_today_sets_state_to_due(self, authenticated_client):
+        from datetime import date, timedelta
+
+        # Create a chore
+        create_r = await authenticated_client.post("/chores", json=WEEKLY_CHORE)
+        chore_id = create_r.json()["id"]
+
+        # First set to a future date
+        future_date = (date.today() + timedelta(days=5)).isoformat()
+        await authenticated_client.put(f"/chores/{chore_id}", json={"next_due": future_date})
+
+        # Update next_due to today (should set state to "due")
+        today = date.today().isoformat()
+        r = await authenticated_client.put(f"/chores/{chore_id}", json={"next_due": today})
+        assert r.status_code == 200
+        assert r.json()["state"] == "due"
+        assert r.json()["next_due"] == today
+
+    @pytest.mark.asyncio
+    async def test_update_next_due_back_to_future_resets_complete(self, authenticated_client):
+        from datetime import date, timedelta
+
+        # Create a chore
+        create_r = await authenticated_client.post("/chores", json=WEEKLY_CHORE)
+        chore_id = create_r.json()["id"]
+
+        # Set next_due to past date (state becomes "due")
+        past_date = (date.today() - timedelta(days=2)).isoformat()
+        r = await authenticated_client.put(f"/chores/{chore_id}", json={"next_due": past_date})
+        assert r.status_code == 200
+        assert r.json()["state"] == "due"
+
+        # Update next_due back to future (state should go back to "complete")
+        future_date = (date.today() + timedelta(days=7)).isoformat()
+        r = await authenticated_client.put(f"/chores/{chore_id}", json={"next_due": future_date})
+        assert r.status_code == 200
+        assert r.json()["state"] == "complete"
+        assert r.json()["next_due"] == future_date
+
+    @pytest.mark.asyncio
+    async def test_update_next_due_with_assignment_changes(self, authenticated_client):
+        from datetime import date, timedelta
+
+        # Set up people for assignment test
+        await authenticated_client.post("/people", json={"name": "Alice", "username": "alice"})
+        await authenticated_client.post("/people", json={"name": "Bob", "username": "bob"})
+
+        # Create a fixed assignment chore
+        create_r = await authenticated_client.post(
+            "/chores",
+            json={
+                "name": "Feed cat",
+                "schedule_type": "weekly",
+                "schedule_config": {"days": [0]},
+                "assignment_type": "fixed",
+                "assignee": "Alice",
+                "points": 1,
+            },
+        )
+        chore_id = create_r.json()["id"]
+        assert create_r.json()["assignee"] == "Alice"
+
+        # Update both next_due to past date and assignee to Bob
+        past_date = (date.today() - timedelta(days=1)).isoformat()
+        r = await authenticated_client.put(
+            f"/chores/{chore_id}",
+            json={"next_due": past_date, "assignee": "Bob"},
+        )
+        assert r.status_code == 200
+        assert r.json()["state"] == "due"
+        assert r.json()["next_due"] == past_date
+        assert r.json()["assignee"] == "Bob"
+        assert r.json()["current_assignee"] == "Bob"
+
+        # Update to future date
+        future_date = (date.today() + timedelta(days=5)).isoformat()
+        r = await authenticated_client.put(f"/chores/{chore_id}", json={"next_due": future_date})
+        assert r.status_code == 200
+        assert r.json()["state"] == "complete"
+        assert r.json()["next_due"] == future_date
+        assert r.json()["assignee"] == "Bob"
+
+    @pytest.mark.asyncio
     async def test_delete_chore(self, authenticated_client):
         create_r = await authenticated_client.post("/chores", json=WEEKLY_CHORE)
         chore_id = create_r.json()["id"]
@@ -237,6 +343,24 @@ class TestChoresAPI:
         r = await authenticated_client.post(f"/chores/{chore_id}/mark-due")
         assert r.status_code == 200
         assert r.json()["state"] == "due"
+
+    @pytest.mark.asyncio
+    async def test_mark_due_action_updates_next_due_to_today(self, authenticated_client):
+        from datetime import date, timedelta
+
+        r = await authenticated_client.post("/chores", json=WEEKLY_CHORE)
+        chore_id = r.json()["id"]
+        original_next_due = r.json()["next_due"]
+
+        # Set next_due to future
+        future_date = (date.today() + timedelta(days=5)).isoformat()
+        await authenticated_client.put(f"/chores/{chore_id}", json={"next_due": future_date})
+
+        # Mark due should set next_due to today
+        r = await authenticated_client.post(f"/chores/{chore_id}/mark-due")
+        assert r.status_code == 200
+        assert r.json()["state"] == "due"
+        assert r.json()["next_due"] == date.today().isoformat()
 
     @pytest.mark.asyncio
     async def test_skip_reassign_action(self, authenticated_client):

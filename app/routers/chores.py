@@ -281,6 +281,26 @@ async def update_chore(chore_id: int, body: ChoreUpdate, current_user: str = Dep
                 new_value=None if new_value is None else str(new_value),
             )
 
+    # Reset state if next_due was updated to a future date
+    if "next_due" in updates:
+        old_state = chore.state
+        if chore.next_due is not None and chore.next_due <= date.today():
+            chore.state = "due"
+        else:
+            chore.state = "complete"
+
+        if chore.state != old_state:
+            await log_chore_change(
+                chore_id=chore.id,
+                chore_name=chore.name,
+                action="updated",
+                person=current_user,
+                db=db,
+                field_name="state",
+                old_value=old_state,
+                new_value=chore.state,
+            )
+
     db.add(chore)
     await db.commit()
     await db.refresh(chore)

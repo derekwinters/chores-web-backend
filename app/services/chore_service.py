@@ -288,9 +288,10 @@ async def reassign_chore(chore: Chore, db: AsyncSession, assignee: str) -> Chore
 
 
 async def mark_due_chore(chore: Chore, db: AsyncSession) -> Chore:
-    if chore.state == "due":
+    if chore.state == "due" and chore.next_due == date.today():
         return chore
     chore.state = "due"
+    chore.next_due = date.today()
     chore.last_changed_at = _now()
     chore.last_changed_by = None
     chore.last_change_type = CHANGE_MARKED_DUE

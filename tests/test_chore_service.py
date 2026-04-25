@@ -340,15 +340,31 @@ class TestMarkDueChore:
         assert result.last_change_type == "marked_due"
 
     @pytest.mark.asyncio
-    async def test_noop_when_already_due(self, db):
-        chore = _make_chore(state="due")
+    async def test_noop_when_already_due_with_today_date(self, db):
+        from datetime import date
+        chore = _make_chore(state="due", next_due=date.today())
         db.add(chore)
         await db.commit()
         await db.refresh(chore)
 
         result = await mark_due_chore(chore, db)
         assert result.state == "due"
+        assert result.next_due == date.today()
         assert result.last_change_type is None
+
+    @pytest.mark.asyncio
+    async def test_updates_next_due_when_marking_due(self, db):
+        from datetime import date, timedelta
+        future_date = date.today() + timedelta(days=5)
+        chore = _make_chore(state="due", next_due=future_date)
+        db.add(chore)
+        await db.commit()
+        await db.refresh(chore)
+
+        result = await mark_due_chore(chore, db)
+        assert result.state == "due"
+        assert result.next_due == date.today()
+        assert result.last_change_type == "marked_due"
 
 
 class TestTransitionOverdueChores:
