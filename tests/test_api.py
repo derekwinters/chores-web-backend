@@ -185,6 +185,42 @@ class TestChoresAPI:
         assert data["rotation_index"] == 1
 
     @pytest.mark.asyncio
+    async def test_unassign_open_chore(self, authenticated_client):
+        await authenticated_client.post("/people", json={"name": "Alice", "username": "alice"})
+        create_r = await authenticated_client.post(
+            "/chores",
+            json={
+                "name": "Dishes",
+                "schedule_type": "weekly",
+                "schedule_config": {"days": [0]},
+                "assignment_type": "open",
+                "points": 1,
+            },
+        )
+        chore_id = create_r.json()["id"]
+
+        # Assign to Alice
+        r = await authenticated_client.put(
+            f"/chores/{chore_id}",
+            json={"current_assignee": "Alice"},
+        )
+        assert r.status_code == 200
+        assert r.json()["current_assignee"] == "Alice"
+
+        # Unassign (set to null)
+        r = await authenticated_client.put(
+            f"/chores/{chore_id}",
+            json={"current_assignee": None},
+        )
+        assert r.status_code == 200
+        assert r.json()["current_assignee"] is None
+
+        # Verify by fetching chore again
+        r = await authenticated_client.get(f"/chores/{chore_id}")
+        assert r.status_code == 200
+        assert r.json()["current_assignee"] is None
+
+    @pytest.mark.asyncio
     async def test_update_next_due_from_past_to_future_resets_state_to_complete(self, authenticated_client):
         from datetime import date, timedelta
 

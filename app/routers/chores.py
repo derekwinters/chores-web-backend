@@ -178,15 +178,17 @@ async def create_chore(body: ChoreCreate, current_user: str = Depends(get_curren
 @router.put("/{chore_id}", response_model=ChoreOut)
 async def update_chore(chore_id: int, body: ChoreUpdate, current_user: str = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     chore = await _get_or_404(chore_id, db)
-    updates = body.model_dump(exclude_none=True)
-    current_assignee = updates.pop("current_assignee", None)
-    next_assignee = updates.pop("next_assignee", None)
+    updates = body.model_dump(exclude_unset=True)
+    has_current_assignee = "current_assignee" in updates
+    has_next_assignee = "next_assignee" in updates
+    current_assignee = updates.pop("current_assignee", chore.current_assignee) if has_current_assignee else chore.current_assignee
+    next_assignee = updates.pop("next_assignee", chore.next_assignee if hasattr(chore, "next_assignee") else None) if has_next_assignee else None
     target_assignment_type = updates.get("assignment_type", chore.assignment_type)
     target_eligible_people = updates.get("eligible_people", chore.eligible_people)
     target_assignee = updates.get("assignee", chore.assignee)
-    target_current_assignee = current_assignee if current_assignee is not None else chore.current_assignee
+    target_current_assignee = current_assignee
 
-    if target_assignment_type == "fixed" and updates.get("assignee") is not None and current_assignee is None:
+    if target_assignment_type == "fixed" and updates.get("assignee") is not None:
         target_current_assignee = updates["assignee"]
 
     people_to_validate = updates.get("eligible_people")
@@ -242,8 +244,11 @@ async def update_chore(chore_id: int, body: ChoreUpdate, current_user: str = Dep
 
         setattr(chore, field, value)
 
-    if target_assignment_type == "fixed" and updates.get("assignee") is not None and current_assignee is None:
+    if target_assignment_type == "fixed" and updates.get("assignee") is not None:
         current_assignee = updates["assignee"]
+
+    if has_current_assignee:
+        chore.current_assignee = current_assignee
 
     if current_assignee is not None or next_assignee is not None or any(
         key in updates for key in ("assignment_type", "eligible_people", "assignee")
@@ -257,7 +262,7 @@ async def update_chore(chore_id: int, body: ChoreUpdate, current_user: str = Dep
             assignment_type=target_assignment_type,
             eligible_people=target_eligible_people,
             assignee=target_assignee,
-            current_assignee=current_assignee,
+            current_assignee=current_assignee if current_assignee is not None else chore.current_assignee,
             next_assignee=next_assignee,
         )
 
