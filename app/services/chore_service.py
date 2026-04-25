@@ -27,6 +27,19 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def get_today(tz_name: str = "UTC") -> date:
+    """Get today's date in specified timezone."""
+    if tz_name == "UTC":
+        return datetime.now(timezone.utc).date()
+    try:
+        from zoneinfo import ZoneInfo
+        tz = ZoneInfo(tz_name)
+        return datetime.now(tz).date()
+    except (ImportError, Exception):
+        # Fallback to UTC if timezone is invalid
+        return datetime.now(timezone.utc).date()
+
+
 def validate_assignment(chore) -> Optional[dict[str, str]]:
     """Validate chore assignment configuration.
 
@@ -287,11 +300,13 @@ async def reassign_chore(chore: Chore, db: AsyncSession, assignee: str) -> Chore
     return chore
 
 
-async def mark_due_chore(chore: Chore, db: AsyncSession) -> Chore:
-    if chore.state == "due" and chore.next_due == date.today():
+async def mark_due_chore(chore: Chore, db: AsyncSession, timezone: str = None) -> Chore:
+    # If timezone not provided, use system local date (for backward compatibility with tests)
+    today = get_today(timezone) if timezone else date.today()
+    if chore.state == "due" and chore.next_due == today:
         return chore
     chore.state = "due"
-    chore.next_due = date.today()
+    chore.next_due = today
     chore.last_changed_at = _now()
     chore.last_changed_by = None
     chore.last_change_type = CHANGE_MARKED_DUE

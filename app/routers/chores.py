@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
-from ..models import Chore, Person
+from ..models import Chore, Person, Settings
 from ..schemas import (
     ChoreCreate,
     ChoreOut,
@@ -55,6 +55,12 @@ def _enrich(chore: Chore) -> ChoreOut:
     out.schedule_summary = compute_schedule_summary(chore)
     out.next_assignee = compute_next_assignee(chore)
     return out
+
+
+async def _get_timezone(db: AsyncSession) -> str:
+    result = await db.execute(select(Settings).where(Settings.key == "timezone"))
+    settings_row = result.scalar_one_or_none()
+    return settings_row.value if settings_row else "UTC"
 
 
 async def _get_or_404(chore_id: int, db: AsyncSession) -> Chore:
@@ -355,4 +361,5 @@ async def action_reassign(chore_id: int, body: ReassignBody, current_user: str =
 @router.post("/{chore_id}/mark-due", response_model=ChoreOut)
 async def action_mark_due(chore_id: int, current_user: str = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     chore = await _get_or_404(chore_id, db)
-    return _enrich(await mark_due_chore(chore, db))
+    timezone = await _get_timezone(db)
+    return _enrich(await mark_due_chore(chore, db, timezone=timezone))

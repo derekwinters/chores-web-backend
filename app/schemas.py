@@ -189,11 +189,13 @@ class UserStatsOut(BaseModel):
 class ConfigUpdate(BaseModel):
     title: Optional[str] = None
     auth_enabled: Optional[bool] = None
+    timezone: Optional[str] = None
 
 
 class ConfigOut(BaseModel):
     title: str
     auth_enabled: bool
+    timezone: str
 
 
 # ── Theme ────────────────────────────────────────────────────────────────────

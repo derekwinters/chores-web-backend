@@ -388,15 +388,17 @@ class TestChoresAPI:
         chore_id = r.json()["id"]
         original_next_due = r.json()["next_due"]
 
-        # Set next_due to future
-        future_date = (date.today() + timedelta(days=5)).isoformat()
+        # Set next_due to future (use UTC-consistent date)
+        from datetime import datetime, timezone as tz
+        utc_today = datetime.now(tz.utc).date()
+        future_date = (utc_today + timedelta(days=5)).isoformat()
         await authenticated_client.put(f"/chores/{chore_id}", json={"next_due": future_date})
 
         # Mark due should set next_due to today
         r = await authenticated_client.post(f"/chores/{chore_id}/mark-due")
         assert r.status_code == 200
         assert r.json()["state"] == "due"
-        assert r.json()["next_due"] == date.today().isoformat()
+        assert r.json()["next_due"] == utc_today.isoformat()
 
     @pytest.mark.asyncio
     async def test_skip_reassign_action(self, authenticated_client):

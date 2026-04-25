@@ -24,11 +24,17 @@ async def _get_auth_enabled(db: AsyncSession) -> bool:
     return settings_row and settings_row.value.lower() == "true" if settings_row else True
 
 
+async def _get_timezone(db: AsyncSession) -> str:
+    """Get timezone setting from database. Default to UTC if not set."""
+    return await _get_setting(db, "timezone", "UTC")
+
+
 @router.get("", response_model=ConfigOut)
 async def get_config(current_user: str = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     title = await _get_setting(db, "title", "Family Chores")
     auth_enabled = await _get_auth_enabled(db)
-    return ConfigOut(title=title, auth_enabled=auth_enabled)
+    timezone = await _get_timezone(db)
+    return ConfigOut(title=title, auth_enabled=auth_enabled, timezone=timezone)
 
 
 @router.put("", response_model=ConfigOut)
@@ -51,8 +57,18 @@ async def update_config(body: ConfigUpdate, current_user: str = Depends(get_curr
             settings_row = Settings(key="auth_enabled", value=str(body.auth_enabled))
             db.add(settings_row)
 
+    if body.timezone is not None:
+        result = await db.execute(select(Settings).where(Settings.key == "timezone"))
+        settings_row = result.scalar_one_or_none()
+        if settings_row:
+            settings_row.value = body.timezone
+        else:
+            settings_row = Settings(key="timezone", value=body.timezone)
+            db.add(settings_row)
+
     await db.commit()
 
     title = await _get_setting(db, "title", "Family Chores")
     auth_enabled = await _get_auth_enabled(db)
-    return ConfigOut(title=title, auth_enabled=auth_enabled)
+    timezone = await _get_timezone(db)
+    return ConfigOut(title=title, auth_enabled=auth_enabled, timezone=timezone)
