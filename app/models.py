@@ -20,6 +20,7 @@ class Person(Base):
     color: Mapped[str] = mapped_column(Text, nullable=False, default="#004272")
     goal_7d: Mapped[int] = mapped_column(Integer, nullable=False, default=20)
     goal_30d: Mapped[int] = mapped_column(Integer, nullable=False, default=80)
+    points: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     preferred_theme: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
 

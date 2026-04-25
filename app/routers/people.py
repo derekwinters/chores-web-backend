@@ -53,12 +53,17 @@ async def update_person(person_id: int, body: PersonUpdate, current_user: str = 
         if existing.scalar_one_or_none():
             raise HTTPException(status_code=409, detail="Username already exists")
 
+    # Validate points are non-negative
+    if body.points is not None and body.points < 0:
+        raise HTTPException(status_code=400, detail="Points must be non-negative")
+
     updates = {
         "name": body.name,
         "username": body.username,
         "color": body.color,
         "goal_7d": body.goal_7d,
         "goal_30d": body.goal_30d,
+        "points": body.points,
         "is_admin": body.is_admin,
     }
 

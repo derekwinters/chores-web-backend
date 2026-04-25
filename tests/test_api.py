@@ -87,6 +87,42 @@ class TestPeopleAPI:
         r = await authenticated_client.post("/people", json={"name": "Frank", "username": "eve123"})
         assert r.status_code == 409  # Conflict - duplicate username
 
+    @pytest.mark.asyncio
+    async def test_person_has_points_field_with_default(self, authenticated_client):
+        r = await authenticated_client.post("/people", json={"name": "George", "username": "george123"})
+        assert r.status_code == 201
+        data = r.json()
+        assert "points" in data
+        assert data["points"] == 0
+
+    @pytest.mark.asyncio
+    async def test_admin_can_update_points(self, authenticated_client):
+        create_r = await authenticated_client.post("/people", json={"name": "Helen", "username": "helen"})
+        person_id = create_r.json()["id"]
+
+        r = await authenticated_client.put(f"/people/{person_id}", json={"points": 100})
+        assert r.status_code == 200
+        assert r.json()["points"] == 100
+
+    @pytest.mark.asyncio
+    async def test_negative_points_rejected(self, authenticated_client):
+        create_r = await authenticated_client.post("/people", json={"name": "Ivan", "username": "ivan"})
+        person_id = create_r.json()["id"]
+
+        r = await authenticated_client.put(f"/people/{person_id}", json={"points": -10})
+        assert r.status_code == 400
+        assert "non-negative" in r.json()["detail"]
+
+    @pytest.mark.asyncio
+    async def test_points_persists_after_update(self, authenticated_client):
+        create_r = await authenticated_client.post("/people", json={"name": "Jack", "username": "jack"})
+        person_id = create_r.json()["id"]
+
+        await authenticated_client.put(f"/people/{person_id}", json={"points": 50})
+        r = await authenticated_client.get(f"/people")
+        person = next(p for p in r.json() if p["id"] == person_id)
+        assert person["points"] == 50
+
 
 class TestChoresAPI:
     @pytest.mark.asyncio
