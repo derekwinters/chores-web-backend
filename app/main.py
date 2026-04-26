@@ -11,6 +11,7 @@ from .routers import auth, chores, people, points, log, config, theme, export, d
 from .services.scheduler import start_scheduler, stop_scheduler
 from .services.chore_service import transition_overdue_chores
 from .database import AsyncSessionLocal
+from .migrations import apply_migrations
 
 
 logging.basicConfig(
@@ -28,6 +29,7 @@ async def lifespan(app: FastAPI):
         await conn.run_sync(Base.metadata.create_all)
 
     async with AsyncSessionLocal() as db:
+        await apply_migrations(db)
         await transition_overdue_chores(db)
 
     start_scheduler()

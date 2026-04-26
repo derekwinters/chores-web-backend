@@ -7,7 +7,7 @@ from typing import Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models import Chore, PointsLog, ChoreLog
+from ..models import Chore, PointsLog, ChoreLog, Person
 from ..scheduling import build_schedule
 
 CHANGE_COMPLETED = "completed"
@@ -227,6 +227,13 @@ async def complete_chore(
             completed_at=_now(),
         )
         db.add(log)
+
+        # Update person's total points
+        person_result = await db.execute(select(Person).where(Person.name == completed_by))
+        person = person_result.scalar_one_or_none()
+        if person:
+            person.points += chore.points
+            db.add(person)
 
     if chore.assignment_type == "rotating" and chore.eligible_people:
         chore.rotation_index = (chore.rotation_index + 1) % len(chore.eligible_people)

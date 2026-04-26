@@ -96,32 +96,58 @@ class TestPeopleAPI:
         assert data["points"] == 0
 
     @pytest.mark.asyncio
-    async def test_admin_can_update_points(self, authenticated_client):
-        create_r = await authenticated_client.post("/people", json={"name": "Helen", "username": "helen"})
-        person_id = create_r.json()["id"]
+    async def test_points_auto_update_on_chore_completion(self, authenticated_client):
+        person_r = await authenticated_client.post("/people", json={"name": "Helen", "username": "helen"})
+        person_id = person_r.json()["id"]
 
-        r = await authenticated_client.put(f"/people/{person_id}", json={"points": 100})
-        assert r.status_code == 200
-        assert r.json()["points"] == 100
+        chore_r = await authenticated_client.post("/chores", json={
+            "name": "Test Chore",
+            "schedule_type": "interval",
+            "schedule_config": {"days": 1},
+            "points": 25
+        })
+        chore_id = chore_r.json()["id"]
+
+        # Complete chore
+        await authenticated_client.post(f"/chores/{chore_id}/complete", json={"completed_by": "Helen"})
+
+        # Check person points updated
+        people_r = await authenticated_client.get(f"/people")
+        person = next(p for p in people_r.json() if p["id"] == person_id)
+        assert person["points"] == 25
 
     @pytest.mark.asyncio
-    async def test_negative_points_rejected(self, authenticated_client):
+    async def test_points_cannot_be_manually_set(self, authenticated_client):
         create_r = await authenticated_client.post("/people", json={"name": "Ivan", "username": "ivan"})
         person_id = create_r.json()["id"]
 
-        r = await authenticated_client.put(f"/people/{person_id}", json={"points": -10})
-        assert r.status_code == 400
-        assert "non-negative" in r.json()["detail"]
+        # Try to set points via update - should be ignored
+        r = await authenticated_client.put(f"/people/{person_id}", json={"points": 100})
+        assert r.status_code == 200
+        # Points should still be 0 (not 100)
+        assert r.json()["points"] == 0
 
     @pytest.mark.asyncio
-    async def test_points_persists_after_update(self, authenticated_client):
+    async def test_multiple_completions_accumulate_points(self, authenticated_client):
         create_r = await authenticated_client.post("/people", json={"name": "Jack", "username": "jack"})
         person_id = create_r.json()["id"]
 
-        await authenticated_client.put(f"/people/{person_id}", json={"points": 50})
-        r = await authenticated_client.get(f"/people")
-        person = next(p for p in r.json() if p["id"] == person_id)
-        assert person["points"] == 50
+        chore_r = await authenticated_client.post("/chores", json={
+            "name": "Test Chore",
+            "schedule_type": "interval",
+            "schedule_config": {"days": 1},
+            "points": 30
+        })
+        chore_id = chore_r.json()["id"]
+
+        # Complete twice
+        await authenticated_client.post(f"/chores/{chore_id}/complete", json={"completed_by": "Jack"})
+        await authenticated_client.post(f"/chores/{chore_id}/complete", json={"completed_by": "Jack"})
+
+        # Check total points
+        people_r = await authenticated_client.get(f"/people")
+        person = next(p for p in people_r.json() if p["id"] == person_id)
+        assert person["points"] == 60
 
 
 class TestChoresAPI:

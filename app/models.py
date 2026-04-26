@@ -21,6 +21,7 @@ class Person(Base):
     goal_7d: Mapped[int] = mapped_column(Integer, nullable=False, default=20)
     goal_30d: Mapped[int] = mapped_column(Integer, nullable=False, default=80)
     points: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    points_redeemed: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     preferred_theme: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
 
@@ -70,6 +71,16 @@ class PointsLog(Base):
     points: Mapped[int] = mapped_column(Integer, nullable=False)
     chore_id: Mapped[int] = mapped_column(Integer, nullable=False)
     completed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class RedemptionLog(Base):
+    __tablename__ = "redemption_log"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    person_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    amount: Mapped[int] = mapped_column(Integer, nullable=False)
+    redeemed_by: Mapped[str] = mapped_column(Text, nullable=False)
+    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
 class ChoreLog(Base):

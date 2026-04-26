@@ -77,9 +77,17 @@ async def user_stats(person: str, current_user: str = Depends(get_current_user),
     completed_count = sum(1 for log in chore_logs if log.action == "completed")
     skipped_count = sum(1 for log in chore_logs if log.action == "skipped")
 
+    person_result = await db.execute(
+        select(Person).where(Person.name == person)
+    )
+    person_obj = person_result.scalar_one_or_none()
+    points_redeemed = person_obj.points_redeemed if person_obj else 0
+    display_points = total_points - points_redeemed
+
     return UserStatsOut(
         name=person,
         total_points=total_points,
+        display_points=display_points,
         points_7d=points_7d,
         points_30d=points_30d,
         completed_count=completed_count,
