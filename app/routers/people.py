@@ -88,6 +88,8 @@ async def delete_person(person_id: int, current_user: str = Depends(require_admi
 
 @router.post("/{person_id}/redeem", response_model=PersonOut)
 async def redeem_points(person_id: int, body: PersonRedemption, current_user: str = Depends(require_admin), db: AsyncSession = Depends(get_db)):
+    from ..models import PointsLog
+
     result = await db.execute(select(Person).where(Person.id == person_id))
     person = result.scalar_one_or_none()
     if not person:
@@ -96,7 +98,12 @@ async def redeem_points(person_id: int, body: PersonRedemption, current_user: st
     if body.amount <= 0:
         raise HTTPException(status_code=400, detail="Redemption amount must be positive")
 
-    available_points = person.points - person.points_redeemed
+    # Calculate total points from PointsLog (same as stats endpoint)
+    points_result = await db.execute(select(PointsLog).where(PointsLog.person == person.name))
+    logs = points_result.scalars().all()
+    total_points = sum(log.points for log in logs)
+
+    available_points = total_points - person.points_redeemed
     if body.amount > available_points:
         raise HTTPException(status_code=400, detail=f"Insufficient points. Available: {available_points}")
 
