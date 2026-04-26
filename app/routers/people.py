@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
 from ..models import Person, RedemptionLog
-from ..schemas import PersonCreate, PersonOut, PersonUpdate, PersonRedemption
+from ..schemas import PersonCreate, PersonOut, PersonUpdate, PersonRedemption, RedemptionLogOut
 from ..dependencies import get_current_user, require_admin
 from ..security import hash_password
 
@@ -111,3 +111,18 @@ async def redeem_points(person_id: int, body: PersonRedemption, current_user: st
     await db.commit()
     await db.refresh(person)
     return person
+
+
+@router.get("/{person_id}/redemptions", response_model=list[RedemptionLogOut])
+async def get_redemption_history(person_id: int, current_user: str = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Person).where(Person.id == person_id))
+    person = result.scalar_one_or_none()
+    if not person:
+        raise HTTPException(status_code=404, detail="Person not found")
+
+    redemptions_result = await db.execute(
+        select(RedemptionLog)
+        .where(RedemptionLog.person_id == person_id)
+        .order_by(RedemptionLog.timestamp.desc())
+    )
+    return redemptions_result.scalars().all()

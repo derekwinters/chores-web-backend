@@ -149,6 +149,81 @@ class TestPeopleAPI:
         person = next(p for p in people_r.json() if p["id"] == person_id)
         assert person["points"] == 60
 
+    @pytest.mark.asyncio
+    async def test_redemption_history_empty(self, authenticated_client):
+        create_r = await authenticated_client.post("/people", json={"name": "Karen", "username": "karen"})
+        person_id = create_r.json()["id"]
+
+        r = await authenticated_client.get(f"/people/{person_id}/redemptions")
+        assert r.status_code == 200
+        assert r.json() == []
+
+    @pytest.mark.asyncio
+    async def test_redemption_history_not_found(self, authenticated_client):
+        r = await authenticated_client.get(f"/people/999/redemptions")
+        assert r.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_redemption_history_after_redemption(self, authenticated_client):
+        person_r = await authenticated_client.post("/people", json={"name": "Laura", "username": "laura"})
+        person_id = person_r.json()["id"]
+
+        # Create and complete chore to earn points
+        chore_r = await authenticated_client.post("/chores", json={
+            "name": "Test",
+            "schedule_type": "interval",
+            "schedule_config": {"days": 1},
+            "points": 50
+        })
+        chore_id = chore_r.json()["id"]
+        await authenticated_client.post(f"/chores/{chore_id}/complete", json={"completed_by": "Laura"})
+
+        # Redeem points
+        redeem_r = await authenticated_client.post(
+            f"/people/{person_id}/redeem",
+            json={"amount": 25}
+        )
+        assert redeem_r.status_code == 200
+
+        # Get history
+        history_r = await authenticated_client.get(f"/people/{person_id}/redemptions")
+        assert history_r.status_code == 200
+        redemptions = history_r.json()
+        assert len(redemptions) == 1
+        assert redemptions[0]["amount"] == 25
+        assert redemptions[0]["person_id"] == person_id
+        assert "redeemed_by" in redemptions[0]
+        assert "timestamp" in redemptions[0]
+
+    @pytest.mark.asyncio
+    async def test_redemption_history_sorted_by_timestamp(self, authenticated_client):
+        person_r = await authenticated_client.post("/people", json={"name": "Mike", "username": "mike"})
+        person_id = person_r.json()["id"]
+
+        # Create and complete chore to earn points
+        chore_r = await authenticated_client.post("/chores", json={
+            "name": "Test",
+            "schedule_type": "interval",
+            "schedule_config": {"days": 1},
+            "points": 100
+        })
+        chore_id = chore_r.json()["id"]
+        await authenticated_client.post(f"/chores/{chore_id}/complete", json={"completed_by": "Mike"})
+
+        # Multiple redemptions
+        await authenticated_client.post(f"/people/{person_id}/redeem", json={"amount": 10})
+        await authenticated_client.post(f"/people/{person_id}/redeem", json={"amount": 20})
+        await authenticated_client.post(f"/people/{person_id}/redeem", json={"amount": 15})
+
+        # Get history
+        history_r = await authenticated_client.get(f"/people/{person_id}/redemptions")
+        redemptions = history_r.json()
+
+        assert len(redemptions) == 3
+        # Verify sorted by timestamp desc (newest first)
+        timestamps = [r["timestamp"] for r in redemptions]
+        assert timestamps == sorted(timestamps, reverse=True)
+
 
 class TestChoresAPI:
     @pytest.mark.asyncio
