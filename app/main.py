@@ -24,10 +24,7 @@ logger = logging.getLogger('app.services.logging')
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Create any missing tables
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
+    # Apply database migrations
     async with AsyncSessionLocal() as db:
         await apply_migrations(db)
         await transition_overdue_chores(db)
