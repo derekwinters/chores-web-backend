@@ -104,3 +104,14 @@ class Settings(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     key: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
     value: Mapped[str] = mapped_column(Text, nullable=False)
+
+
+class UpdateCheck(Base):
+    __tablename__ = "update_checks"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    current_version: Mapped[str] = mapped_column(Text, nullable=False)
+    latest_version: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    last_checked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    check_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    check_interval_hours: Mapped[int] = mapped_column(Integer, nullable=False, default=24)

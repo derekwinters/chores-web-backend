@@ -2,11 +2,13 @@ import logging
 from datetime import datetime, timedelta
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.interval import IntervalTrigger
 from sqlalchemy import delete
 
 from ..database import AsyncSessionLocal
 from ..models import ChoreLog
 from .chore_service import transition_overdue_chores
+from .update_check_service import check_for_updates
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +34,13 @@ async def _weekly_log_cleanup() -> None:
         await db.commit()
 
 
+async def _periodic_update_check() -> None:
+    """Periodic background task to check for app updates."""
+    async with AsyncSessionLocal() as db:
+        await check_for_updates(db)
+        logger.debug("Update check completed")
+
+
 def start_scheduler() -> None:
     scheduler.add_job(
         _midnight_transition,
@@ -43,6 +52,12 @@ def start_scheduler() -> None:
         _weekly_log_cleanup,
         CronTrigger(day_of_week=6, hour=3, minute=0),
         id="weekly_log_cleanup",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        _periodic_update_check,
+        IntervalTrigger(hours=24),
+        id="periodic_update_check",
         replace_existing=True,
     )
     scheduler.start()

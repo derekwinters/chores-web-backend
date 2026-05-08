@@ -208,6 +208,8 @@ class ConfigUpdate(BaseModel):
     auth_enabled: Optional[bool] = None
     timezone: Optional[str] = None
     due_soon_days: Optional[int] = None
+    update_check_enabled: Optional[bool] = None
+    update_check_interval: Optional[int] = None
 
     @field_validator("due_soon_days")
     @classmethod
@@ -216,12 +218,32 @@ class ConfigUpdate(BaseModel):
             raise ValueError("due_soon_days must be between 1 and 365")
         return v
 
+    @field_validator("update_check_interval")
+    @classmethod
+    def validate_update_check_interval(cls, v):
+        if v is not None and v < 1:
+            raise ValueError("update_check_interval must be at least 1 hour")
+        return v
+
 
 class ConfigOut(BaseModel):
     title: str
     auth_enabled: bool
     timezone: str
     due_soon_days: int
+    update_check_enabled: bool
+    update_check_interval: int
+
+
+class UpdateCheckStatus(BaseModel):
+    current_version: str
+    latest_version: Optional[str] = None
+    last_checked_at: Optional[datetime] = None
+    check_enabled: bool
+    check_interval_hours: int
+    update_available: bool = False
+
+    model_config = {"from_attributes": True}
 
 
 # ── Theme ────────────────────────────────────────────────────────────────────

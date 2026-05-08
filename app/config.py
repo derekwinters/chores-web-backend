@@ -1,5 +1,8 @@
 from pydantic_settings import BaseSettings
 
+# Current application version
+APP_VERSION = "1.2.0"
+
 
 class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://chores:chores@db/chores"
