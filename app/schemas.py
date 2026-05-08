@@ -207,12 +207,21 @@ class ConfigUpdate(BaseModel):
     title: Optional[str] = None
     auth_enabled: Optional[bool] = None
     timezone: Optional[str] = None
+    due_soon_days: Optional[int] = None
+
+    @field_validator("due_soon_days")
+    @classmethod
+    def validate_due_soon_days(cls, v):
+        if v is not None and (v < 1 or v > 365):
+            raise ValueError("due_soon_days must be between 1 and 365")
+        return v
 
 
 class ConfigOut(BaseModel):
     title: str
     auth_enabled: bool
     timezone: str
+    due_soon_days: int
 
 
 # ── Theme ────────────────────────────────────────────────────────────────────

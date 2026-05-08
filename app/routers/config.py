@@ -29,12 +29,20 @@ async def _get_timezone(db: AsyncSession) -> str:
     return await _get_setting(db, "timezone", "UTC")
 
 
+async def _get_due_soon_days(db: AsyncSession) -> int:
+    """Get due_soon_days setting from database. Default to 3 if not set."""
+    result = await db.execute(select(Settings).where(Settings.key == "due_soon_days"))
+    settings_row = result.scalar_one_or_none()
+    return int(settings_row.value) if settings_row else 3
+
+
 @router.get("", response_model=ConfigOut)
 async def get_config(current_user: str = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     title = await _get_setting(db, "title", "Family Chores")
     auth_enabled = await _get_auth_enabled(db)
     timezone = await _get_timezone(db)
-    return ConfigOut(title=title, auth_enabled=auth_enabled, timezone=timezone)
+    due_soon_days = await _get_due_soon_days(db)
+    return ConfigOut(title=title, auth_enabled=auth_enabled, timezone=timezone, due_soon_days=due_soon_days)
 
 
 @router.put("", response_model=ConfigOut)
@@ -66,9 +74,19 @@ async def update_config(body: ConfigUpdate, current_user: str = Depends(get_curr
             settings_row = Settings(key="timezone", value=body.timezone)
             db.add(settings_row)
 
+    if body.due_soon_days is not None:
+        result = await db.execute(select(Settings).where(Settings.key == "due_soon_days"))
+        settings_row = result.scalar_one_or_none()
+        if settings_row:
+            settings_row.value = str(body.due_soon_days)
+        else:
+            settings_row = Settings(key="due_soon_days", value=str(body.due_soon_days))
+            db.add(settings_row)
+
     await db.commit()
 
     title = await _get_setting(db, "title", "Family Chores")
     auth_enabled = await _get_auth_enabled(db)
     timezone = await _get_timezone(db)
-    return ConfigOut(title=title, auth_enabled=auth_enabled, timezone=timezone)
+    due_soon_days = await _get_due_soon_days(db)
+    return ConfigOut(title=title, auth_enabled=auth_enabled, timezone=timezone, due_soon_days=due_soon_days)
