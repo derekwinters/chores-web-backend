@@ -341,14 +341,14 @@ async def action_complete(chore_id: int, body: CompleteBody, current_user: str =
 @router.post("/{chore_id}/skip", response_model=ChoreOut)
 async def action_skip(chore_id: int, current_user: str = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     chore = await _get_or_404(chore_id, db)
-    return _enrich(await skip_chore(chore, db))
+    return _enrich(await skip_chore(chore, db, skipped_by=current_user))
 
 
 @router.post("/{chore_id}/skip-reassign", response_model=ChoreOut)
 async def action_skip_reassign(chore_id: int, body: SkipReassignBody, current_user: str = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     await _validate_people_exist(db, None, body.assignee)
     chore = await _get_or_404(chore_id, db)
-    return _enrich(await skip_and_reassign_chore(chore, db, assignee=body.assignee))
+    return _enrich(await skip_and_reassign_chore(chore, db, assignee=body.assignee, skipped_by=current_user))
 
 
 @router.post("/{chore_id}/reassign", response_model=ChoreOut)

@@ -496,6 +496,15 @@ class TestChoresAPI:
         assert r.json()["state"] == "complete"
         assert r.json()["last_change_type"] == "skipped"
 
+        # Verify ChoreLog has correct person (not "system")
+        r = await authenticated_client.get(f"/log?chore_id={chore_id}&action=skipped")
+        assert r.status_code == 200
+        logs = r.json()
+        assert len(logs) > 0
+        log_entry = logs[0]
+        assert log_entry["person"] == "testuser"
+        assert log_entry["action"] == "skipped"
+
     @pytest.mark.asyncio
     async def test_reassign_action(self, authenticated_client):
         await authenticated_client.post("/people", json={"name": "Alice", "username": "alice"})
@@ -550,6 +559,15 @@ class TestChoresAPI:
         data = r.json()
         assert data["state"] == "complete"
         assert data["current_assignee"] == "Bob"
+
+        # Verify ChoreLog has correct person for skip action (not "system")
+        r = await authenticated_client.get(f"/log?chore_id={chore_id}&action=skipped")
+        assert r.status_code == 200
+        logs = r.json()
+        assert len(logs) > 0
+        skip_log = logs[0]
+        assert skip_log["person"] == "testuser"
+        assert skip_log["action"] == "skipped"
 
     @pytest.mark.asyncio
     async def test_reject_invalid_eligible_people(self, authenticated_client):

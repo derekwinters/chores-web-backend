@@ -255,14 +255,14 @@ async def complete_chore(
     return chore
 
 
-async def skip_chore(chore: Chore, db: AsyncSession) -> Chore:
+async def skip_chore(chore: Chore, db: AsyncSession, skipped_by: Optional[str] = None) -> Chore:
     chore.next_due = _calc_next_due(chore)
     chore.state = "complete"
     chore.last_changed_at = _now()
     chore.last_changed_by = None
     chore.last_change_type = CHANGE_SKIPPED
 
-    await _log_action(chore, CHANGE_SKIPPED, "system", db)
+    await _log_action(chore, CHANGE_SKIPPED, skipped_by or "system", db)
 
     db.add(chore)
     await db.commit()
@@ -274,8 +274,9 @@ async def skip_and_reassign_chore(
     chore: Chore,
     db: AsyncSession,
     assignee: Optional[str] = None,
+    skipped_by: Optional[str] = None,
 ) -> Chore:
-    chore = await skip_chore(chore, db)
+    chore = await skip_chore(chore, db, skipped_by=skipped_by)
 
     if assignee:
         chore.current_assignee = assignee
