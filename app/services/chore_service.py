@@ -228,8 +228,8 @@ async def complete_chore(
         )
         db.add(log)
 
-        # Update person's total points
-        person_result = await db.execute(select(Person).where(Person.name == completed_by))
+        # Update person's total points by username
+        person_result = await db.execute(select(Person).where(Person.username == completed_by))
         person = person_result.scalar_one_or_none()
         if person:
             person.points += chore.points
@@ -308,7 +308,7 @@ async def reassign_chore(chore: Chore, db: AsyncSession, assignee: str) -> Chore
     return chore
 
 
-async def mark_due_chore(chore: Chore, db: AsyncSession, timezone: str = None) -> Chore:
+async def mark_due_chore(chore: Chore, db: AsyncSession, marked_by: Optional[str] = None, timezone: str = None) -> Chore:
     # If timezone not provided, use system local date (for backward compatibility with tests)
     today = get_today(timezone) if timezone else date.today()
     if chore.state == "due" and chore.next_due == today:
@@ -316,10 +316,10 @@ async def mark_due_chore(chore: Chore, db: AsyncSession, timezone: str = None) -
     chore.state = "due"
     chore.next_due = today
     chore.last_changed_at = _now()
-    chore.last_changed_by = None
+    chore.last_changed_by = marked_by
     chore.last_change_type = CHANGE_MARKED_DUE
 
-    await _log_action(chore, CHANGE_MARKED_DUE, "system", db)
+    await _log_action(chore, CHANGE_MARKED_DUE, marked_by or "system", db)
 
     db.add(chore)
     await db.commit()
@@ -338,7 +338,7 @@ async def transition_overdue_chores(db: AsyncSession) -> int:
         chore.state = "due"
         chore.last_changed_at = _now()
         chore.last_change_type = CHANGE_FORCED_DUE
-        await _log_action(chore, "marked_due_by_schedule", "system", db)
+        await _log_action(chore, CHANGE_MARKED_DUE, "schedule", db)
         db.add(chore)
     if chores:
         await db.commit()

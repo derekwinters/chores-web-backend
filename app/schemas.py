@@ -135,7 +135,7 @@ class ChoreOut(BaseModel):
 # ── Actions ───────────────────────────────────────────────────────────────────
 
 class CompleteBody(BaseModel):
-    completed_by: Optional[str] = None
+    pass
 
 
 class SkipReassignBody(BaseModel):

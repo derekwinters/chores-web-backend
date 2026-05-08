@@ -335,7 +335,7 @@ async def delete_chore(chore_id: int, current_user: str = Depends(get_current_us
 @router.post("/{chore_id}/complete", response_model=ChoreOut)
 async def action_complete(chore_id: int, body: CompleteBody, current_user: str = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     chore = await _get_or_404(chore_id, db)
-    return _enrich(await complete_chore(chore, db, completed_by=body.completed_by))
+    return _enrich(await complete_chore(chore, db, completed_by=current_user))
 
 
 @router.post("/{chore_id}/skip", response_model=ChoreOut)
@@ -362,4 +362,4 @@ async def action_reassign(chore_id: int, body: ReassignBody, current_user: str =
 async def action_mark_due(chore_id: int, current_user: str = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     chore = await _get_or_404(chore_id, db)
     timezone = await _get_timezone(db)
-    return _enrich(await mark_due_chore(chore, db, timezone=timezone))
+    return _enrich(await mark_due_chore(chore, db, marked_by=current_user, timezone=timezone))

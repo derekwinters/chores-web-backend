@@ -99,7 +99,7 @@ async def redeem_points(person_id: int, body: PersonRedemption, current_user: st
         raise HTTPException(status_code=400, detail="Redemption amount must be positive")
 
     # Calculate total points from PointsLog (same as stats endpoint)
-    points_result = await db.execute(select(PointsLog).where(PointsLog.person == person.name))
+    points_result = await db.execute(select(PointsLog).where(PointsLog.person == person.username))
     logs = points_result.scalars().all()
     total_points = sum(log.points for log in logs)
 

@@ -29,7 +29,7 @@ async def points_summary(current_user: str = Depends(get_current_user), db: Asyn
     cutoff_7d = now - timedelta(days=7)
     cutoff_30d = now - timedelta(days=30)
 
-    people_result = await db.execute(select(Person.name).order_by(Person.name))
+    people_result = await db.execute(select(Person.username).order_by(Person.username))
     people = [row[0] for row in people_result]
 
     log_result = await db.execute(
@@ -78,14 +78,15 @@ async def user_stats(person: str, current_user: str = Depends(get_current_user),
     skipped_count = sum(1 for log in chore_logs if log.action == "skipped")
 
     person_result = await db.execute(
-        select(Person).where(Person.name == person)
+        select(Person).where(Person.username == person)
     )
     person_obj = person_result.scalar_one_or_none()
     points_redeemed = person_obj.points_redeemed if person_obj else 0
     display_points = total_points - points_redeemed
+    display_name = person_obj.name if person_obj else person
 
     return UserStatsOut(
-        name=person,
+        name=display_name,
         total_points=total_points,
         display_points=display_points,
         points_7d=points_7d,
