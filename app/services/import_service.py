@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models import Person, Chore, Settings
 from ..security import hash_password
-from .export_service import compute_schema_version, EXPORT_SCHEMA
+from .export_service import compute_schema_version, EXPORT_SCHEMA, BOOL_CONFIG_KEYS, INT_CONFIG_KEYS
 
 DEFAULT_IMPORT_PASSWORD = "password"
 
@@ -102,7 +102,24 @@ async def import_config(
             db.add(chore)
 
         for key, value in data.get("config", {}).items():
-            setting = Settings(key=key, value=value)
+            # Normalize boolean and integer config values to canonical string form.
+            # This prevents re-introducing Python-stringified "True"/"False" when
+            # importing old backups that pre-date this fix.
+            if key in BOOL_CONFIG_KEYS:
+                # Accept both Python ("True") and JSON ("true") boolean strings as
+                # well as actual booleans (if the import file has already been fixed).
+                if isinstance(value, bool):
+                    normalized = str(value).lower()
+                else:
+                    normalized = "true" if str(value).lower() == "true" else "false"
+            elif key in INT_CONFIG_KEYS:
+                try:
+                    normalized = str(int(value))
+                except (ValueError, TypeError):
+                    normalized = str(value)
+            else:
+                normalized = str(value) if not isinstance(value, str) else value
+            setting = Settings(key=key, value=normalized)
             db.add(setting)
 
         await db.commit()

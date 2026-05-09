@@ -1,6 +1,7 @@
 """Tests for config endpoints."""
 import pytest
 from httpx import AsyncClient
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Settings
@@ -153,6 +154,32 @@ async def test_update_config_due_soon_days_boundary_high(authenticated_client: A
     assert r.status_code == 200
     data = r.json()
     assert data["due_soon_days"] == 365
+
+
+@pytest.mark.asyncio
+async def test_update_config_auth_enabled_stores_lowercase(authenticated_client: AsyncClient, db: AsyncSession):
+    """Test that PUT /config with auth_enabled=false stores lowercase 'false' in the DB, not Python 'False'."""
+    r = await authenticated_client.put("/config", json={"auth_enabled": False})
+    assert r.status_code == 200
+    assert r.json()["auth_enabled"] is False
+
+    result = await db.execute(select(Settings).where(Settings.key == "auth_enabled"))
+    setting = result.scalar_one_or_none()
+    assert setting is not None
+    assert setting.value == "false", f"Expected 'false' but got '{setting.value}'"
+
+
+@pytest.mark.asyncio
+async def test_update_config_update_check_enabled_stores_lowercase(authenticated_client: AsyncClient, db: AsyncSession):
+    """Test that PUT /config with update_check_enabled=false stores lowercase 'false' in the DB."""
+    r = await authenticated_client.put("/config", json={"update_check_enabled": False})
+    assert r.status_code == 200
+    assert r.json()["update_check_enabled"] is False
+
+    result = await db.execute(select(Settings).where(Settings.key == "update_check_enabled"))
+    setting = result.scalar_one_or_none()
+    assert setting is not None
+    assert setting.value == "false", f"Expected 'false' but got '{setting.value}'"
 
 
 @pytest.mark.asyncio

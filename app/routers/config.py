@@ -88,9 +88,9 @@ async def update_config(body: ConfigUpdate, current_user: str = Depends(get_curr
         result = await db.execute(select(Settings).where(Settings.key == "auth_enabled"))
         settings_row = result.scalar_one_or_none()
         if settings_row:
-            settings_row.value = str(body.auth_enabled)
+            settings_row.value = str(body.auth_enabled).lower()
         else:
-            settings_row = Settings(key="auth_enabled", value=str(body.auth_enabled))
+            settings_row = Settings(key="auth_enabled", value=str(body.auth_enabled).lower())
             db.add(settings_row)
 
     if body.timezone is not None:
@@ -115,9 +115,9 @@ async def update_config(body: ConfigUpdate, current_user: str = Depends(get_curr
         result = await db.execute(select(Settings).where(Settings.key == "update_check_enabled"))
         settings_row = result.scalar_one_or_none()
         if settings_row:
-            settings_row.value = str(body.update_check_enabled)
+            settings_row.value = str(body.update_check_enabled).lower()
         else:
-            settings_row = Settings(key="update_check_enabled", value=str(body.update_check_enabled))
+            settings_row = Settings(key="update_check_enabled", value=str(body.update_check_enabled).lower())
             db.add(settings_row)
 
     if body.update_check_interval is not None:
