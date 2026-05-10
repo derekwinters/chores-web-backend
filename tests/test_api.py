@@ -710,6 +710,76 @@ class TestLogAPI:
         assert "reassigned" in actions
         assert "updated" not in actions
 
+    @pytest.mark.asyncio
+    async def test_complete_log_entry_has_assignee(self, authenticated_client):
+        # Create people first so the rotating chore assignment is valid
+        await authenticated_client.post("/people", json={"name": "Alice", "username": "alice"})
+        await authenticated_client.post("/people", json={"name": "Bob", "username": "bob"})
+
+        r = await authenticated_client.post("/chores", json=ROTATING_CHORE)
+        chore_id = r.json()["id"]
+
+        await authenticated_client.post(f"/chores/{chore_id}/mark-due")
+        await authenticated_client.post(f"/chores/{chore_id}/complete", json={})
+
+        r = await authenticated_client.get(f"/log?chore_id={chore_id}&action=completed")
+        assert r.status_code == 200
+        logs = r.json()
+        assert len(logs) > 0
+        entry = logs[0]
+        assert "assignee" in entry
+        # Rotating chore: assignee is the current_assignee before completion (Alice, index 0)
+        assert entry["assignee"] == "Alice"
+
+    @pytest.mark.asyncio
+    async def test_complete_log_entry_assignee_null_for_open_chore(self, authenticated_client):
+        r = await authenticated_client.post("/chores", json=WEEKLY_CHORE)
+        chore_id = r.json()["id"]
+
+        await authenticated_client.post(f"/chores/{chore_id}/mark-due")
+        await authenticated_client.post(f"/chores/{chore_id}/complete", json={})
+
+        r = await authenticated_client.get(f"/log?chore_id={chore_id}&action=completed")
+        assert r.status_code == 200
+        logs = r.json()
+        assert len(logs) > 0
+        entry = logs[0]
+        assert "assignee" in entry
+        # Open chore has no current_assignee, so assignee is null
+        assert entry["assignee"] is None
+
+    @pytest.mark.asyncio
+    async def test_skip_log_entry_has_null_assignee(self, authenticated_client):
+        r = await authenticated_client.post("/chores", json=WEEKLY_CHORE)
+        chore_id = r.json()["id"]
+
+        await authenticated_client.post(f"/chores/{chore_id}/mark-due")
+        await authenticated_client.post(f"/chores/{chore_id}/skip")
+
+        r = await authenticated_client.get(f"/log?chore_id={chore_id}&action=skipped")
+        assert r.status_code == 200
+        logs = r.json()
+        assert len(logs) > 0
+        entry = logs[0]
+        assert "assignee" in entry
+        assert entry["assignee"] is None
+
+    @pytest.mark.asyncio
+    async def test_reassign_log_entry_has_null_assignee(self, authenticated_client):
+        await authenticated_client.post("/people", json={"name": "Alice", "username": "alice"})
+        r = await authenticated_client.post("/chores", json=WEEKLY_CHORE)
+        chore_id = r.json()["id"]
+
+        await authenticated_client.post(f"/chores/{chore_id}/reassign", json={"assignee": "Alice"})
+
+        r = await authenticated_client.get(f"/log?chore_id={chore_id}&action=reassigned")
+        assert r.status_code == 200
+        logs = r.json()
+        assert len(logs) > 0
+        entry = logs[0]
+        assert "assignee" in entry
+        assert entry["assignee"] is None
+
 
 class TestUserLogAPI:
     @pytest.mark.asyncio

@@ -176,6 +176,7 @@ class ChoreLogOut(BaseModel):
     action: str
     timestamp: datetime
     reassigned_to: Optional[str] = None
+    assignee: Optional[str] = None
     field_name: Optional[str] = None
     old_value: Optional[str] = None
     new_value: Optional[str] = None

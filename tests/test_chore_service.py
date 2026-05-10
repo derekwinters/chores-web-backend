@@ -271,6 +271,39 @@ class TestCompleteChore:
         assert result.current_assignee == "Bob"
         assert result.rotation_index == 1
 
+    @pytest.mark.asyncio
+    async def test_complete_chore_sets_assignee_to_current_assignee(self, db):
+        chore = _make_chore(
+            state="due",
+            schedule_type="interval",
+            schedule_config={"days": 7},
+            assignment_type="rotating",
+            eligible_people=["Alice", "Bob"],
+            current_assignee="Alice",
+            rotation_index=0,
+        )
+        db.add(chore)
+        await db.commit()
+        await db.refresh(chore)
+
+        await complete_chore(chore, db, completed_by="Bob")
+
+        log = (await db.execute(select(ChoreLog).where(ChoreLog.action == "completed"))).scalar_one()
+        # assignee is who was assigned BEFORE completion (Alice), not who completed it (Bob)
+        assert log.assignee == "Alice"
+
+    @pytest.mark.asyncio
+    async def test_complete_chore_assignee_null_when_no_current_assignee(self, db):
+        chore = _make_chore(state="due", schedule_type="interval", schedule_config={"days": 7})
+        db.add(chore)
+        await db.commit()
+        await db.refresh(chore)
+
+        await complete_chore(chore, db, completed_by=None)
+
+        log = (await db.execute(select(ChoreLog).where(ChoreLog.action == "completed"))).scalar_one()
+        assert log.assignee is None
+
 
 class TestSkipChore:
     @pytest.mark.asyncio

@@ -183,6 +183,7 @@ async def _log_action(
     person: str,
     db: AsyncSession,
     reassigned_to: Optional[str] = None,
+    assignee: Optional[str] = None,
 ) -> None:
     log = ChoreLog(
         chore_id=chore.id,
@@ -191,6 +192,7 @@ async def _log_action(
         action=action,
         timestamp=_now(),
         reassigned_to=reassigned_to,
+        assignee=assignee,
     )
     db.add(log)
 
@@ -219,6 +221,9 @@ async def complete_chore(
     db: AsyncSession,
     completed_by: Optional[str] = None,
 ) -> Chore:
+    # Capture the assignee before any reassignment logic runs
+    chore_assignee = chore.current_assignee
+
     if chore.points > 0 and completed_by:
         log = PointsLog(
             person=completed_by,
@@ -247,7 +252,7 @@ async def complete_chore(
     chore.last_completed_at = _now()
     chore.last_completed_by = completed_by
 
-    await _log_action(chore, CHANGE_COMPLETED, completed_by or "system", db)
+    await _log_action(chore, CHANGE_COMPLETED, completed_by or "system", db, assignee=chore_assignee)
 
     db.add(chore)
     await db.commit()

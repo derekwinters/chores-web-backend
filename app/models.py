@@ -93,6 +93,7 @@ class ChoreLog(Base):
     action: Mapped[str] = mapped_column(Text, nullable=False)
     timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     reassigned_to: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    assignee: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     field_name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     old_value: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     new_value: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
