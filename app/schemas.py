@@ -264,6 +264,24 @@ class UpdateCheckStatus(BaseModel):
     model_config = {"from_attributes": True}
 
 
+# ── Admin DB ─────────────────────────────────────────────────────────────────
+
+class PointsLogUpdate(BaseModel):
+    points: int
+    person: str
+
+
+class PointsLogAdminOut(PointsLogOut):
+    pass
+
+
+class AdminDbPage(BaseModel):
+    items: list[PointsLogAdminOut]
+    total: int
+    offset: int
+    limit: int
+
+
 # ── Theme ────────────────────────────────────────────────────────────────────
 
 class ThemeColors(BaseModel):

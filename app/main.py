@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .database import engine
 from .models import Base
-from .routers import auth, chores, people, points, log, config, theme, export, data_import, status
+from .routers import auth, chores, people, points, log, config, theme, export, data_import, status, admin_db
 from .services.scheduler import start_scheduler, stop_scheduler
 from .services.chore_service import transition_overdue_chores
 from .database import AsyncSessionLocal
@@ -61,6 +61,7 @@ app.include_router(theme.router)
 app.include_router(export.router)
 app.include_router(data_import.router)
 app.include_router(status.router)
+app.include_router(admin_db.router)
 
 
 @app.get("/health")
