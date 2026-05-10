@@ -183,6 +183,21 @@ class ChoreLogOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class UserLogOut(BaseModel):
+    id: int
+    chore_id: int
+    chore_name: str
+    person: str
+    action: str
+    timestamp: datetime
+    reassigned_to: Optional[str] = None
+    field_name: Optional[str] = None
+    old_value: Optional[str] = None
+    new_value: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+
 class LeaderboardEntry(BaseModel):
     person: str
     total_points: int

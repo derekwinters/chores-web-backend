@@ -9,6 +9,7 @@ from ..models import Person, RedemptionLog
 from ..schemas import PersonCreate, PersonOut, PersonUpdate, PersonRedemption, RedemptionLogOut
 from ..dependencies import get_current_user, require_admin
 from ..security import hash_password
+from ..services.logging import log_person_change
 
 router = APIRouter(prefix="/people", tags=["people"])
 
@@ -55,6 +56,10 @@ async def update_person(person_id: int, body: PersonUpdate, current_user: str = 
         if existing.scalar_one_or_none():
             raise HTTPException(status_code=409, detail="Username already exists")
 
+    # Loggable fields: capture old values before mutation
+    loggable_fields = ["name", "username", "color", "goal_7d", "goal_30d", "is_admin", "preferred_theme"]
+    old_values = {f: getattr(person, f) for f in loggable_fields}
+
     updates = {
         "name": body.name,
         "username": body.username,
@@ -62,6 +67,7 @@ async def update_person(person_id: int, body: PersonUpdate, current_user: str = 
         "goal_7d": body.goal_7d,
         "goal_30d": body.goal_30d,
         "is_admin": body.is_admin,
+        "preferred_theme": body.preferred_theme,
     }
 
     for field, value in updates.items():
@@ -69,7 +75,34 @@ async def update_person(person_id: int, body: PersonUpdate, current_user: str = 
             setattr(person, field, value)
 
     if body.password:
+        old_pw = person.password_hash
         person.password_hash = hash_password(body.password)
+        await log_person_change(
+            person_id=person.id,
+            person_name=person.name,
+            action="updated",
+            changed_by=current_user,
+            db=db,
+            field_name="password",
+            old_value=old_pw,
+            new_value="set",
+        )
+
+    # Log each changed loggable field
+    for field in loggable_fields:
+        new_val = getattr(person, field)
+        old_val = old_values[field]
+        if old_val != new_val:
+            await log_person_change(
+                person_id=person.id,
+                person_name=person.name,
+                action="updated",
+                changed_by=current_user,
+                db=db,
+                field_name=field,
+                old_value=None if old_val is None else str(old_val),
+                new_value=None if new_val is None else str(new_val),
+            )
 
     await db.commit()
     await db.refresh(person)

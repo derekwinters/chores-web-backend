@@ -276,6 +276,7 @@ async def skip_and_reassign_chore(
     assignee: Optional[str] = None,
     skipped_by: Optional[str] = None,
 ) -> Chore:
+    old_assignee = chore.current_assignee
     chore = await skip_chore(chore, db, skipped_by=skipped_by)
 
     if assignee:
@@ -286,13 +287,22 @@ async def skip_and_reassign_chore(
         chore.rotation_index = (chore.rotation_index + 1) % len(chore.eligible_people)
         chore.current_assignee = chore.eligible_people[chore.rotation_index]
 
+    if chore.current_assignee != old_assignee:
+        await _log_action(
+            chore,
+            CHANGE_REASSIGNED,
+            skipped_by or "system",
+            db,
+            reassigned_to=chore.current_assignee,
+        )
+
     db.add(chore)
     await db.commit()
     await db.refresh(chore)
     return chore
 
 
-async def reassign_chore(chore: Chore, db: AsyncSession, assignee: str) -> Chore:
+async def reassign_chore(chore: Chore, db: AsyncSession, assignee: str, person: str = "system") -> Chore:
     chore.current_assignee = assignee
     if chore.assignment_type == "rotating" and assignee in chore.eligible_people:
         chore.rotation_index = chore.eligible_people.index(assignee)
@@ -300,7 +310,7 @@ async def reassign_chore(chore: Chore, db: AsyncSession, assignee: str) -> Chore
     chore.last_changed_by = None
     chore.last_change_type = CHANGE_REASSIGNED
 
-    await _log_action(chore, CHANGE_REASSIGNED, "system", db, reassigned_to=assignee)
+    await _log_action(chore, CHANGE_REASSIGNED, person, db, reassigned_to=assignee)
 
     db.add(chore)
     await db.commit()

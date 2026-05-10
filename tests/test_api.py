@@ -695,11 +695,13 @@ class TestLogAPI:
         await authenticated_client.post(f"/chores/{chore_id}/reassign", json={"assignee": "Bob"})
         await authenticated_client.put(f"/chores/{chore_id}", json={"points": 9})
 
+        # After fixing reassign_chore to record the requesting user, testuser is now
+        # the actor for both completed and reassigned — both show up when filtering by testuser.
         r = await authenticated_client.get("/log?person=testuser&actions=completed&actions=reassigned")
         assert r.status_code == 200
         actions = [entry["action"] for entry in r.json()]
         assert "completed" in actions
-        assert "reassigned" not in actions
+        assert "reassigned" in actions  # testuser is now correctly recorded (not "system")
 
         r = await authenticated_client.get("/log?actions=completed&actions=reassigned")
         assert r.status_code == 200
@@ -707,3 +709,159 @@ class TestLogAPI:
         assert "completed" in actions
         assert "reassigned" in actions
         assert "updated" not in actions
+
+
+class TestUserLogAPI:
+    @pytest.mark.asyncio
+    async def test_goal_change_logged_in_unified_log(self, authenticated_client):
+        r = await authenticated_client.post("/people", json={"name": "Alice", "username": "alice"})
+        person_id = r.json()["id"]
+
+        r = await authenticated_client.put(f"/people/{person_id}", json={"goal_7d": 30})
+        assert r.status_code == 200
+
+        r = await authenticated_client.get("/log")
+        assert r.status_code == 200
+        logs = r.json()
+        person_entries = [e for e in logs if e["chore_name"].startswith("Person:")]
+        assert len(person_entries) >= 1
+        goal_entry = next(
+            (e for e in person_entries if e.get("field_name") == "goal_7d"),
+            None,
+        )
+        assert goal_entry is not None
+        assert goal_entry["old_value"] == "20"
+        assert goal_entry["new_value"] == "30"
+        assert goal_entry["action"] == "updated"
+
+    @pytest.mark.asyncio
+    async def test_goal_30d_change_logged(self, authenticated_client):
+        r = await authenticated_client.post("/people", json={"name": "Bob", "username": "bob"})
+        person_id = r.json()["id"]
+
+        await authenticated_client.put(f"/people/{person_id}", json={"goal_30d": 100})
+
+        r = await authenticated_client.get("/log")
+        logs = r.json()
+        entry = next(
+            (e for e in logs if e.get("field_name") == "goal_30d"),
+            None,
+        )
+        assert entry is not None
+        assert entry["old_value"] == "80"
+        assert entry["new_value"] == "100"
+
+    @pytest.mark.asyncio
+    async def test_no_log_when_no_change(self, authenticated_client):
+        r = await authenticated_client.post("/people", json={"name": "Carol", "username": "carol"})
+        person_id = r.json()["id"]
+
+        # Send update with same value as default (goal_7d=20 already)
+        await authenticated_client.put(f"/people/{person_id}", json={"goal_7d": 20})
+
+        r = await authenticated_client.get("/log")
+        logs = r.json()
+        person_goal_entries = [
+            e for e in logs
+            if e["chore_name"].startswith("Person:") and e.get("field_name") == "goal_7d"
+        ]
+        assert len(person_goal_entries) == 0
+
+    @pytest.mark.asyncio
+    async def test_password_change_masked_in_log(self, authenticated_client):
+        r = await authenticated_client.post("/people", json={"name": "Dave", "username": "dave"})
+        person_id = r.json()["id"]
+
+        await authenticated_client.put(f"/people/{person_id}", json={"password": "newpassword123"})
+
+        r = await authenticated_client.get("/log")
+        logs = r.json()
+        pw_entries = [e for e in logs if e.get("field_name") == "password"]
+        assert len(pw_entries) >= 1
+        assert pw_entries[0]["old_value"] == "changed"
+        assert pw_entries[0]["new_value"] == "changed"
+
+    @pytest.mark.asyncio
+    async def test_person_log_uses_sentinel_chore_id(self, authenticated_client):
+        r = await authenticated_client.post("/people", json={"name": "Eve", "username": "eve"})
+        person_id = r.json()["id"]
+        await authenticated_client.put(f"/people/{person_id}", json={"goal_7d": 25})
+
+        r = await authenticated_client.get("/log")
+        logs = r.json()
+        person_entries = [e for e in logs if e["chore_name"].startswith("Person:")]
+        assert all(e["chore_id"] == 0 for e in person_entries)
+
+    @pytest.mark.asyncio
+    async def test_person_log_excluded_when_real_chore_id_filtered(self, authenticated_client):
+        r = await authenticated_client.post("/people", json={"name": "Frank", "username": "frank"})
+        person_id = r.json()["id"]
+        await authenticated_client.put(f"/people/{person_id}", json={"goal_7d": 25})
+
+        # Create a chore so we have a real chore_id to filter on
+        r = await authenticated_client.post("/chores", json=WEEKLY_CHORE)
+        chore_id = r.json()["id"]
+
+        r = await authenticated_client.get(f"/log?chore_id={chore_id}")
+        logs = r.json()
+        person_entries = [e for e in logs if e["chore_name"].startswith("Person:")]
+        assert len(person_entries) == 0
+
+    @pytest.mark.asyncio
+    async def test_unified_log_sorted_by_timestamp_desc(self, authenticated_client):
+        r = await authenticated_client.post("/people", json={"name": "Grace", "username": "grace"})
+        person_id = r.json()["id"]
+
+        r = await authenticated_client.post("/chores", json=WEEKLY_CHORE)
+        chore_id = r.json()["id"]
+        await authenticated_client.post(f"/chores/{chore_id}/mark-due")
+        await authenticated_client.post(f"/chores/{chore_id}/complete", json={})
+
+        await authenticated_client.put(f"/people/{person_id}", json={"goal_7d": 35})
+
+        r = await authenticated_client.get("/log")
+        assert r.status_code == 200
+        logs = r.json()
+        timestamps = [e["timestamp"] for e in logs]
+        assert timestamps == sorted(timestamps, reverse=True)
+
+    @pytest.mark.asyncio
+    async def test_skip_reassign_logs_reassignment(self, authenticated_client):
+        await authenticated_client.post("/people", json={"name": "Alice", "username": "alice"})
+        await authenticated_client.post("/people", json={"name": "Bob", "username": "bob"})
+        r = await authenticated_client.post("/chores", json=ROTATING_CHORE)
+        chore_id = r.json()["id"]
+        await authenticated_client.post(f"/chores/{chore_id}/mark-due")
+
+        r = await authenticated_client.post(
+            f"/chores/{chore_id}/skip-reassign", json={"assignee": "Bob"}
+        )
+        assert r.status_code == 200
+
+        r = await authenticated_client.get(f"/log?chore_id={chore_id}&action=reassigned")
+        assert r.status_code == 200
+        logs = r.json()
+        assert len(logs) >= 1
+        assert logs[0]["action"] == "reassigned"
+        assert logs[0]["reassigned_to"] == "Bob"
+
+    @pytest.mark.asyncio
+    async def test_reassign_logs_requesting_user(self, authenticated_client):
+        await authenticated_client.post("/people", json={"name": "Alice", "username": "alice"})
+        await authenticated_client.post("/people", json={"name": "Bob", "username": "bob"})
+        r = await authenticated_client.post("/chores", json=ROTATING_CHORE)
+        chore_id = r.json()["id"]
+        await authenticated_client.post(f"/chores/{chore_id}/mark-due")
+
+        r = await authenticated_client.post(
+            f"/chores/{chore_id}/reassign", json={"assignee": "Bob"}
+        )
+        assert r.status_code == 200
+
+        r = await authenticated_client.get(f"/log?chore_id={chore_id}&action=reassigned")
+        assert r.status_code == 200
+        logs = r.json()
+        assert len(logs) >= 1
+        reassign_log = next(e for e in logs if e["action"] == "reassigned")
+        # Should be the requesting user, not "system"
+        assert reassign_log["person"] == "testuser"

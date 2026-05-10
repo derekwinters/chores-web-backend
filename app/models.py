@@ -98,6 +98,20 @@ class ChoreLog(Base):
     new_value: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
 
+class UserLog(Base):
+    __tablename__ = "user_log"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    person_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    person_name: Mapped[str] = mapped_column(Text, nullable=False)
+    action: Mapped[str] = mapped_column(Text, nullable=False)
+    field_name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    old_value: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    new_value: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    changed_by: Mapped[str] = mapped_column(Text, nullable=False)
+    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
 class Settings(Base):
     __tablename__ = "settings"
 

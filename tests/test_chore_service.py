@@ -1,8 +1,9 @@
 from datetime import date, datetime, timezone
 
 import pytest
+from sqlalchemy import select
 
-from app.models import Chore, PointsLog
+from app.models import Chore, ChoreLog, PointsLog
 from app.services.chore_service import (
     apply_assignment_state,
     complete_chore,
@@ -388,3 +389,92 @@ class TestTransitionOverdueChores:
 
         count = await transition_overdue_chores(db)
         assert count == 0
+
+
+class TestSkipAndReassignLogging:
+    @pytest.mark.asyncio
+    async def test_skip_and_reassign_logs_reassignment(self, db):
+        chore = _make_chore(
+            state="due",
+            schedule_type="interval",
+            schedule_config={"days": 7},
+            assignment_type="rotating",
+            eligible_people=["Alice", "Bob"],
+            current_assignee="Alice",
+            rotation_index=0,
+        )
+        db.add(chore)
+        await db.commit()
+        await db.refresh(chore)
+
+        await skip_and_reassign_chore(chore, db, assignee="Bob", skipped_by="alice")
+
+        logs = (await db.execute(select(ChoreLog))).scalars().all()
+        actions = [log.action for log in logs]
+        assert "skipped" in actions
+        assert "reassigned" in actions
+
+        reassign_log = next(log for log in logs if log.action == "reassigned")
+        assert reassign_log.reassigned_to == "Bob"
+        assert reassign_log.person == "alice"
+
+    @pytest.mark.asyncio
+    async def test_skip_and_reassign_no_extra_log_when_assignee_unchanged(self, db):
+        """When skip does not change current_assignee, no reassign log is emitted."""
+        chore = _make_chore(
+            state="due",
+            schedule_type="interval",
+            schedule_config={"days": 7},
+            assignment_type="open",
+            eligible_people=[],
+            current_assignee=None,
+        )
+        db.add(chore)
+        await db.commit()
+        await db.refresh(chore)
+
+        await skip_and_reassign_chore(chore, db, assignee=None, skipped_by="system")
+
+        logs = (await db.execute(select(ChoreLog))).scalars().all()
+        actions = [log.action for log in logs]
+        assert "skipped" in actions
+        assert "reassigned" not in actions
+
+
+class TestReassignChoreActor:
+    @pytest.mark.asyncio
+    async def test_reassign_logs_provided_person(self, db):
+        chore = _make_chore(
+            state="due",
+            assignment_type="rotating",
+            eligible_people=["Alice", "Bob"],
+            current_assignee="Alice",
+            rotation_index=0,
+        )
+        db.add(chore)
+        await db.commit()
+        await db.refresh(chore)
+
+        await reassign_chore(chore, db, assignee="Bob", person="derek")
+
+        logs = (await db.execute(select(ChoreLog))).scalars().all()
+        reassign_log = next(log for log in logs if log.action == "reassigned")
+        assert reassign_log.person == "derek"
+        assert reassign_log.reassigned_to == "Bob"
+
+    @pytest.mark.asyncio
+    async def test_reassign_defaults_to_system(self, db):
+        chore = _make_chore(
+            state="due",
+            assignment_type="open",
+            current_assignee="Alice",
+        )
+        db.add(chore)
+        await db.commit()
+        await db.refresh(chore)
+
+        await reassign_chore(chore, db, assignee="Bob")
+
+        logs = (await db.execute(select(ChoreLog))).scalars().all()
+        reassign_log = next(log for log in logs if log.action == "reassigned")
+        assert reassign_log.person == "system"

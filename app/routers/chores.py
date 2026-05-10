@@ -355,7 +355,7 @@ async def action_skip_reassign(chore_id: int, body: SkipReassignBody, current_us
 async def action_reassign(chore_id: int, body: ReassignBody, current_user: str = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     await _validate_people_exist(db, None, body.assignee)
     chore = await _get_or_404(chore_id, db)
-    return _enrich(await reassign_chore(chore, db, assignee=body.assignee))
+    return _enrich(await reassign_chore(chore, db, assignee=body.assignee, person=current_user))
 
 
 @router.post("/{chore_id}/mark-due", response_model=ChoreOut)
