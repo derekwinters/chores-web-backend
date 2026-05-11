@@ -290,9 +290,11 @@ class ThemeColors(BaseModel):
     surface: str
     surface2: str
     accent: str
+    primary: str
+    secondary: str
     success: str
     warning: str
-    danger: str
+    error: str
 
 
 class ThemeOut(BaseModel):
