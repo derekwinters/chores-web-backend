@@ -12,6 +12,11 @@ from ..dependencies import get_current_user
 router = APIRouter(prefix="/points", tags=["points"])
 
 
+def _as_aware(dt: datetime) -> datetime:
+    """Return dt as timezone-aware; assumes UTC if naive."""
+    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+
+
 @router.get("", response_model=list[LeaderboardEntry])
 async def leaderboard(current_user: str = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     result = await db.execute(
@@ -36,9 +41,6 @@ async def points_summary(current_user: str = Depends(get_current_user), db: Asyn
         select(PointsLog).where(PointsLog.completed_at >= cutoff_30d)
     )
     logs = log_result.scalars().all()
-
-    def _as_aware(dt: datetime) -> datetime:
-        return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
 
     totals: dict[str, dict] = {p: {"points_7d": 0, "points_30d": 0} for p in people}
     for log in logs:
@@ -66,8 +68,8 @@ async def user_stats(person: str, current_user: str = Depends(get_current_user),
     logs = result.scalars().all()
 
     total_points = sum(log.points for log in logs)
-    points_7d = sum(log.points for log in logs if log.completed_at >= cutoff_7d)
-    points_30d = sum(log.points for log in logs if log.completed_at >= cutoff_30d)
+    points_7d = sum(log.points for log in logs if _as_aware(log.completed_at) >= cutoff_7d)
+    points_30d = sum(log.points for log in logs if _as_aware(log.completed_at) >= cutoff_30d)
 
     log_result = await db.execute(
         select(ChoreLog).where(ChoreLog.person == person)

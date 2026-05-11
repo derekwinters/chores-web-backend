@@ -676,6 +676,77 @@ class TestPointsAPI:
         assert bob["points_30d"] == 0
 
     @pytest.mark.asyncio
+    async def test_user_stats_returns_nonzero_after_completion(self, authenticated_client):
+        """user_stats should return correct non-zero points_7d and points_30d."""
+        r = await authenticated_client.post("/chores", json=WEEKLY_CHORE)
+        chore_id = r.json()["id"]
+        await authenticated_client.post(f"/chores/{chore_id}/mark-due")
+        await authenticated_client.post(f"/chores/{chore_id}/complete", json={})
+
+        r = await authenticated_client.get("/points/stats/testuser")
+        assert r.status_code == 200
+        data = r.json()
+        assert data["points_7d"] == 5
+        assert data["points_30d"] == 5
+        assert data["total_points"] == 5
+        assert data["display_points"] == 5
+
+    @pytest.mark.asyncio
+    async def test_user_stats_excludes_old_entries(self, authenticated_client, db):
+        """user_stats should exclude PointsLog entries older than the time window."""
+        from datetime import datetime, timedelta, timezone
+        from app.models import PointsLog
+
+        # Insert a PointsLog entry with completed_at 40 days ago (outside both windows)
+        old_entry = PointsLog(
+            person="testuser",
+            chore_id=0,
+            points=99,
+            completed_at=datetime.now(timezone.utc) - timedelta(days=40),
+        )
+        db.add(old_entry)
+        await db.commit()
+
+        r = await authenticated_client.get("/points/stats/testuser")
+        assert r.status_code == 200
+        data = r.json()
+        # Old entry should not appear in 7d or 30d windows
+        assert data["points_7d"] == 0
+        assert data["points_30d"] == 0
+        # But total should include it
+        assert data["total_points"] == 99
+
+    @pytest.mark.asyncio
+    async def test_user_stats_correct_totals_across_windows(self, authenticated_client, db):
+        """user_stats should correctly bucket points into 7d vs 30d windows."""
+        from datetime import datetime, timedelta, timezone
+        from app.models import PointsLog
+
+        # Entry within 7 days (also within 30 days)
+        recent = PointsLog(
+            person="testuser",
+            chore_id=0,
+            points=10,
+            completed_at=datetime.now(timezone.utc) - timedelta(days=3),
+        )
+        # Entry within 30 days but outside 7 days
+        older = PointsLog(
+            person="testuser",
+            chore_id=0,
+            points=20,
+            completed_at=datetime.now(timezone.utc) - timedelta(days=15),
+        )
+        db.add_all([recent, older])
+        await db.commit()
+
+        r = await authenticated_client.get("/points/stats/testuser")
+        assert r.status_code == 200
+        data = r.json()
+        assert data["points_7d"] == 10
+        assert data["points_30d"] == 30
+        assert data["total_points"] == 30
+
+    @pytest.mark.asyncio
     async def test_health(self, authenticated_client):
         r = await authenticated_client.get("/health")
         assert r.status_code == 200
