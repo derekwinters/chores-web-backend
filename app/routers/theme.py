@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
 from ..models import Person
-from ..schemas import ThemeOut, ThemeSave, ThemeColors
+from ..schemas import ThemeOut, ThemeSave, ThemeColors, ThemeUpdate
 from ..dependencies import get_current_user
 
 router = APIRouter(prefix="/theme", tags=["theme"])
@@ -147,6 +147,39 @@ async def set_theme(theme_id: str, current_user: str = Depends(get_current_user)
 async def save_custom_theme(body: ThemeSave, current_user: str = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     theme_id = f"custom_{len(_custom_themes)}"
     theme = ThemeOut(id=theme_id, name=body.name, colors=body.colors)
+    _custom_themes[theme_id] = theme
+    return theme
+
+
+@router.patch("/update/{theme_id}", response_model=ThemeOut)
+async def update_theme(theme_id: str, body: ThemeUpdate, current_user: str = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    if theme_id in DEFAULT_THEMES:
+        raise HTTPException(status_code=400, detail="Cannot modify default themes")
+    if theme_id not in _custom_themes:
+        raise HTTPException(status_code=404, detail="Theme not found")
+
+    theme = _custom_themes[theme_id]
+    if body.name:
+        theme.name = body.name
+    if body.colors:
+        theme.colors = body.colors
+
+    _custom_themes[theme_id] = theme
+    return theme
+
+
+@router.patch("/rename/{theme_id}", response_model=ThemeOut)
+async def rename_theme(theme_id: str, body: dict, current_user: str = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    if theme_id in DEFAULT_THEMES:
+        raise HTTPException(status_code=400, detail="Cannot modify default themes")
+    if theme_id not in _custom_themes:
+        raise HTTPException(status_code=404, detail="Theme not found")
+
+    if "name" not in body or not body["name"]:
+        raise HTTPException(status_code=400, detail="Name is required")
+
+    theme = _custom_themes[theme_id]
+    theme.name = body["name"]
     _custom_themes[theme_id] = theme
     return theme
 

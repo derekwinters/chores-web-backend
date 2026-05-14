@@ -306,3 +306,8 @@ class ThemeOut(BaseModel):
 class ThemeSave(BaseModel):
     name: str
     colors: ThemeColors
+
+
+class ThemeUpdate(BaseModel):
+    name: Optional[str] = None
+    colors: Optional[ThemeColors] = None
