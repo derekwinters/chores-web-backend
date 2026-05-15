@@ -303,6 +303,17 @@ class ThemeOut(BaseModel):
     colors: ThemeColors
 
 
+class ThemeCurrentOut(ThemeOut):
+    """Extended theme response for /theme/current that includes personal preference flag."""
+    is_personal: bool
+
+
+class ThemeDefaultInfo(BaseModel):
+    """Lightweight default theme info accessible to all authenticated users."""
+    id: str
+    name: str
+
+
 class ThemeSave(BaseModel):
     name: str
     colors: ThemeColors
