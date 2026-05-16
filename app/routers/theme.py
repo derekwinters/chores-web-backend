@@ -60,9 +60,9 @@ DEFAULT_THEMES = {
         id="paper",
         name="Paper",
         colors=ThemeColors(
-            bg="#faf8f3",
-            surface="#ffffff",
-            surface2="#f0ede6",
+            bg="#f0ede6",
+            surface="#faf8f3",
+            surface2="#f5f0e9",
             accent="#b8860b",
             primary="#8b6914",
             secondary="#7a7a6a",
@@ -108,10 +108,10 @@ _custom_themes: dict = {}
 
 
 async def _get_default_theme(db: AsyncSession) -> str:
-    """Get default theme ID from database. Returns 'dark' if not set."""
+    """Get default theme ID from database. Returns 'paper' if not set."""
     result = await db.execute(select(Settings).where(Settings.key == "default_theme"))
     settings_row = result.scalar_one_or_none()
-    return settings_row.value if settings_row else "dark"
+    return settings_row.value if settings_row else "paper"
 
 
 async def _set_default_theme(db: AsyncSession, theme_id: str) -> None:
@@ -144,7 +144,7 @@ async def get_current_theme(current_user: str = Depends(get_current_user), db: A
     if theme_id in DEFAULT_THEMES:
         theme = DEFAULT_THEMES[theme_id]
     else:
-        theme = _custom_themes.get(theme_id, DEFAULT_THEMES["dark"])
+        theme = _custom_themes.get(theme_id, DEFAULT_THEMES["paper"])
 
     return ThemeCurrentOut(id=theme.id, name=theme.name, colors=theme.colors, is_personal=has_personal)
 
@@ -155,7 +155,7 @@ async def get_default_theme(current_user: str = Depends(require_admin), db: Asyn
     theme_id = await _get_default_theme(db)
     if theme_id in DEFAULT_THEMES:
         return DEFAULT_THEMES[theme_id]
-    return _custom_themes.get(theme_id, DEFAULT_THEMES["dark"])
+    return _custom_themes.get(theme_id, DEFAULT_THEMES["paper"])
 
 
 @router.get("/default-info", response_model=ThemeDefaultInfo)
@@ -165,7 +165,7 @@ async def get_default_theme_info(current_user: str = Depends(get_current_user), 
     if theme_id in DEFAULT_THEMES:
         theme = DEFAULT_THEMES[theme_id]
     else:
-        theme = _custom_themes.get(theme_id, DEFAULT_THEMES["dark"])
+        theme = _custom_themes.get(theme_id, DEFAULT_THEMES["paper"])
     return ThemeDefaultInfo(id=theme.id, name=theme.name)
 
 
@@ -204,7 +204,7 @@ async def set_theme(theme_id: str, current_user: str = Depends(get_current_user)
 
     if theme_id in DEFAULT_THEMES:
         return DEFAULT_THEMES[theme_id]
-    return _custom_themes.get(theme_id, DEFAULT_THEMES["dark"])
+    return _custom_themes.get(theme_id, DEFAULT_THEMES["paper"])
 
 
 @router.post("/save", response_model=ThemeOut)

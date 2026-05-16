@@ -8,12 +8,12 @@ from app.models import Settings
 
 @pytest.mark.asyncio
 async def test_get_default_theme_returns_dark_when_not_set(authenticated_client: AsyncClient):
-    """GET /theme/default returns dark theme when no default is set in DB."""
+    """GET /theme/default returns paper theme when no default is set in DB."""
     r = await authenticated_client.get("/theme/default")
     assert r.status_code == 200
     data = r.json()
-    assert data["id"] == "dark"
-    assert data["name"] == "Dark"
+    assert data["id"] == "paper"
+    assert data["name"] == "Paper"
 
 
 @pytest.mark.asyncio
@@ -150,8 +150,8 @@ async def test_get_default_theme_info_accessible_to_regular_user(client: AsyncCl
     r = await client.get("/theme/default-info", headers={"Authorization": f"Bearer {token}"})
     assert r.status_code == 200
     data = r.json()
-    assert data["id"] == "dark"
-    assert data["name"] == "Dark"
+    assert data["id"] == "paper"
+    assert data["name"] == "Paper"
 
 
 @pytest.mark.asyncio
@@ -186,7 +186,7 @@ async def test_clear_personal_theme_removes_preference(authenticated_client: Asy
     r4 = await authenticated_client.get("/theme/current")
     data = r4.json()
     assert data["is_personal"] is False
-    assert data["id"] == "dark"
+    assert data["id"] == "paper"
 
 
 @pytest.mark.asyncio
