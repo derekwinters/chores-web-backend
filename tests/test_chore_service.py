@@ -304,6 +304,37 @@ class TestCompleteChore:
         log = (await db.execute(select(ChoreLog).where(ChoreLog.action == "completed"))).scalar_one()
         assert log.assignee is None
 
+    @pytest.mark.asyncio
+    async def test_open_chore_with_individual_assignee_clears_after_completion(self, db):
+        chore = _make_chore(
+            state="due",
+            assignment_type="open",
+            current_assignee="Alice",
+            schedule_type="interval",
+            schedule_config={"days": 7},
+        )
+        db.add(chore)
+        await db.commit()
+        await db.refresh(chore)
+
+        result = await complete_chore(chore, db, completed_by="Alice")
+        assert result.current_assignee is None
+
+    @pytest.mark.asyncio
+    async def test_open_chore_without_individual_assignee_remains_unassigned(self, db):
+        chore = _make_chore(
+            state="due",
+            assignment_type="open",
+            schedule_type="interval",
+            schedule_config={"days": 7},
+        )
+        db.add(chore)
+        await db.commit()
+        await db.refresh(chore)
+
+        result = await complete_chore(chore, db)
+        assert result.current_assignee is None
+
 
 class TestSkipChore:
     @pytest.mark.asyncio

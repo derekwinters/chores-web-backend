@@ -244,6 +244,9 @@ async def complete_chore(
         chore.rotation_index = (chore.rotation_index + 1) % len(chore.eligible_people)
         chore.current_assignee = chore.eligible_people[chore.rotation_index]
 
+    if chore.assignment_type == "open" and chore.current_assignee is not None:
+        chore.current_assignee = None
+
     chore.next_due = _calc_next_due(chore)
     chore.state = "complete"
     chore.last_changed_at = _now()

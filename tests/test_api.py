@@ -488,6 +488,36 @@ class TestChoresAPI:
         assert r.json()["last_completed_by"] == "testuser"
 
     @pytest.mark.asyncio
+    async def test_open_chore_clears_assignee_after_completion(self, authenticated_client):
+        r = await authenticated_client.post("/people", json={"name": "Alice", "username": "alice"})
+        assert r.status_code == 201
+
+        open_chore = {
+            "name": "Open Chore",
+            "schedule_type": "interval",
+            "schedule_config": {"days": 7},
+            "assignment_type": "open",
+            "eligible_people": [],
+            "points": 0,
+        }
+        r = await authenticated_client.post("/chores", json=open_chore)
+        chore_id = r.json()["id"]
+
+        # Assign to an individual, then complete
+        await authenticated_client.put(f"/chores/{chore_id}", json={"current_assignee": "Alice"})
+        await authenticated_client.post(f"/chores/{chore_id}/mark-due")
+        r = await authenticated_client.post(f"/chores/{chore_id}/complete", json={})
+        assert r.status_code == 200
+        assert r.json()["current_assignee"] is None
+
+        # Verify log still records who was assigned at completion time
+        log_r = await authenticated_client.get(f"/log?chore_id={chore_id}&action=completed")
+        assert log_r.status_code == 200
+        logs = log_r.json()
+        assert len(logs) > 0
+        assert logs[0]["assignee"] == "Alice"
+
+    @pytest.mark.asyncio
     async def test_skip_action(self, authenticated_client):
         r = await authenticated_client.post("/chores", json=WEEKLY_CHORE)
         chore_id = r.json()["id"]
