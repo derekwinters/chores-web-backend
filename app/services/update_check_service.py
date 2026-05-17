@@ -69,6 +69,9 @@ async def check_for_updates(db: AsyncSession) -> Optional[str]:
         )
         db.add(update_check)
         await db.commit()
+    elif update_check.current_version != APP_VERSION:
+        update_check.current_version = APP_VERSION
+        await db.commit()
 
     # Check if enough time has passed since last check
     if update_check.last_checked_at:
@@ -106,6 +109,9 @@ async def get_update_status(db: AsyncSession) -> dict:
             check_interval_hours=24,
         )
         db.add(update_check)
+        await db.commit()
+    elif update_check.current_version != APP_VERSION:
+        update_check.current_version = APP_VERSION
         await db.commit()
 
     # Determine if update is available

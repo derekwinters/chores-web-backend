@@ -119,10 +119,10 @@ async def test_check_for_updates_skips_if_disabled(db: AsyncSession):
 @pytest.mark.asyncio
 async def test_version_comparison_identifies_update(db: AsyncSession):
     """Test that version comparison correctly identifies when update is available."""
-    # Create record with older version
+    # Create record with a latest_version newer than APP_VERSION
     update_check = UpdateCheck(
         current_version="1.0.0",
-        latest_version="1.1.0",
+        latest_version="99.0.0",
         check_enabled=True,
         check_interval_hours=24,
     )
