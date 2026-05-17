@@ -43,7 +43,7 @@ async def _make_normal_user(db: AsyncSession, username: str = "user", password: 
 
 async def _make_points_log(
     db: AsyncSession,
-    person_name: str = "Alice",
+    person_name: str = "alice",
     points: int = 10,
     chore_id: int = 1,
 ) -> PointsLog:
@@ -145,12 +145,12 @@ class TestUpdatePointsLog:
         db.add(person)
         await db.commit()
 
-        row = await _make_points_log(db, person_name="Alice", points=10)
+        row = await _make_points_log(db, person_name="alice", points=10)
 
         token = await _token(client, "admin", "adminpass")
         r = await client.patch(
             f"/admin/db/points-log/{row.id}",
-            json={"points": 7, "person": "Alice"},
+            json={"points": 7, "person": "alice"},
             headers={"Authorization": f"Bearer {token}"},
         )
         assert r.status_code == 200
@@ -164,12 +164,12 @@ class TestUpdatePointsLog:
     @pytest.mark.asyncio
     async def test_update_writes_audit_log(self, client: AsyncClient, db: AsyncSession):
         await _make_admin(db)
-        row = await _make_points_log(db, person_name="Alice", points=5)
+        row = await _make_points_log(db, person_name="alice", points=5)
 
         token = await _token(client, "admin", "adminpass")
         await client.patch(
             f"/admin/db/points-log/{row.id}",
-            json={"points": 3, "person": "Alice"},
+            json={"points": 3, "person": "alice"},
             headers={"Authorization": f"Bearer {token}"},
         )
 
@@ -207,6 +207,111 @@ class TestUpdatePointsLog:
         )
         assert r.status_code == 403
 
+    @pytest.mark.asyncio
+    async def test_update_delta_path_uses_username(self, client: AsyncClient, db: AsyncSession):
+        """Points-only change: lookup must use Person.username, not Person.name."""
+        await _make_admin(db)
+        person = Person(name="Alice", username="alice", password_hash="x", points=10)
+        db.add(person)
+        await db.commit()
+
+        # PointsLog stores username (not display name)
+        row = await _make_points_log(db, person_name="alice", points=10)
+
+        token = await _token(client, "admin", "adminpass")
+        r = await client.patch(
+            f"/admin/db/points-log/{row.id}",
+            json={"points": 7, "person": "alice"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 200
+        await db.refresh(person)
+        assert person.points == 7  # 10 + (7-10) = 7
+
+    @pytest.mark.asyncio
+    async def test_update_reassigns_person_adjusts_both_points(self, client: AsyncClient, db: AsyncSession):
+        """Reassign to different person (same points): old loses, new gains."""
+        await _make_admin(db)
+        alice = Person(name="Alice", username="alice", password_hash="x", points=10)
+        bob = Person(name="Bob", username="bob", password_hash="x", points=0)
+        db.add(alice)
+        db.add(bob)
+        await db.commit()
+
+        row = await _make_points_log(db, person_name="alice", points=10)
+
+        token = await _token(client, "admin", "adminpass")
+        r = await client.patch(
+            f"/admin/db/points-log/{row.id}",
+            json={"points": 10, "person": "bob"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 200
+        await db.refresh(alice)
+        await db.refresh(bob)
+        assert alice.points == 0   # lost 10
+        assert bob.points == 10    # gained 10
+
+    @pytest.mark.asyncio
+    async def test_update_person_and_points_simultaneously(self, client: AsyncClient, db: AsyncSession):
+        """Change both person and points: old loses old_points, new gains new_points (no double-delta)."""
+        await _make_admin(db)
+        alice = Person(name="Alice", username="alice", password_hash="x", points=10)
+        bob = Person(name="Bob", username="bob", password_hash="x", points=0)
+        db.add(alice)
+        db.add(bob)
+        await db.commit()
+
+        row = await _make_points_log(db, person_name="alice", points=10)
+
+        token = await _token(client, "admin", "adminpass")
+        r = await client.patch(
+            f"/admin/db/points-log/{row.id}",
+            json={"points": 5, "person": "bob"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 200
+        await db.refresh(alice)
+        await db.refresh(bob)
+        assert alice.points == 0   # lost exactly old_points=10 (not double-adjusted)
+        assert bob.points == 5     # gained new_points=5
+
+    @pytest.mark.asyncio
+    async def test_update_missing_person_silently_skips(self, client: AsyncClient, db: AsyncSession):
+        """Reassign to unknown username: update succeeds, no crash."""
+        await _make_admin(db)
+        row = await _make_points_log(db, person_name="ghost", points=5)
+
+        token = await _token(client, "admin", "adminpass")
+        r = await client.patch(
+            f"/admin/db/points-log/{row.id}",
+            json={"points": 5, "person": "ghost"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 200
+
+    @pytest.mark.asyncio
+    async def test_update_legacy_display_name_in_log(self, client: AsyncClient, db: AsyncSession):
+        """Old PointsLog rows storing display name (not username) still get points adjusted."""
+        await _make_admin(db)
+        # Person has display name 'Alice', username 'alice'
+        person = Person(name="Alice", username="alice", password_hash="x", points=10)
+        db.add(person)
+        await db.commit()
+
+        # Old-style row: person stored as display name, not username
+        row = await _make_points_log(db, person_name="Alice", points=10)
+
+        token = await _token(client, "admin", "adminpass")
+        r = await client.patch(
+            f"/admin/db/points-log/{row.id}",
+            json={"points": 6, "person": "Alice"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 200
+        await db.refresh(person)
+        assert person.points == 6  # 10 + (6-10) = 6
+
 
 # ---------------------------------------------------------------------------
 # Tests: delete (DELETE)
@@ -216,12 +321,11 @@ class TestDeletePointsLog:
     @pytest.mark.asyncio
     async def test_admin_can_delete(self, client: AsyncClient, db: AsyncSession):
         await _make_admin(db)
-        Person(name="Alice", username="alice", password_hash="x", points=10)
         person = Person(name="Alice", username="alice", password_hash="x", points=10)
         db.add(person)
         await db.commit()
 
-        row = await _make_points_log(db, person_name="Alice", points=10)
+        row = await _make_points_log(db, person_name="alice", points=10)
 
         token = await _token(client, "admin", "adminpass")
         r = await client.delete(
@@ -242,7 +346,7 @@ class TestDeletePointsLog:
         db.add(person)
         await db.commit()
 
-        row = await _make_points_log(db, person_name="Alice", points=10)
+        row = await _make_points_log(db, person_name="alice", points=10)
 
         token = await _token(client, "admin", "adminpass")
         await client.delete(
@@ -260,7 +364,7 @@ class TestDeletePointsLog:
         db.add(person)
         await db.commit()
 
-        row = await _make_points_log(db, person_name="Alice", points=10)
+        row = await _make_points_log(db, person_name="alice", points=10)
 
         token = await _token(client, "admin", "adminpass")
         await client.delete(
@@ -274,7 +378,7 @@ class TestDeletePointsLog:
     @pytest.mark.asyncio
     async def test_delete_writes_audit_log(self, client: AsyncClient, db: AsyncSession):
         await _make_admin(db)
-        row = await _make_points_log(db, person_name="Alice", points=5)
+        row = await _make_points_log(db, person_name="alice", points=5)
 
         token = await _token(client, "admin", "adminpass")
         await client.delete(
@@ -299,6 +403,45 @@ class TestDeletePointsLog:
             headers={"Authorization": f"Bearer {token}"},
         )
         assert r.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_delete_reverses_points_uses_username(self, client: AsyncClient, db: AsyncSession):
+        """Delete must look up Person by username, not display name."""
+        await _make_admin(db)
+        person = Person(name="Alice", username="alice", password_hash="x", points=15)
+        db.add(person)
+        await db.commit()
+
+        row = await _make_points_log(db, person_name="alice", points=10)
+
+        token = await _token(client, "admin", "adminpass")
+        r = await client.delete(
+            f"/admin/db/points-log/{row.id}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 204
+        await db.refresh(person)
+        assert person.points == 5  # 15 - 10
+
+    @pytest.mark.asyncio
+    async def test_delete_legacy_display_name_in_log(self, client: AsyncClient, db: AsyncSession):
+        """Old PointsLog rows storing display name still reverse points on delete."""
+        await _make_admin(db)
+        person = Person(name="Alice", username="alice", password_hash="x", points=15)
+        db.add(person)
+        await db.commit()
+
+        # Old-style row: person stored as display name
+        row = await _make_points_log(db, person_name="Alice", points=10)
+
+        token = await _token(client, "admin", "adminpass")
+        r = await client.delete(
+            f"/admin/db/points-log/{row.id}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 204
+        await db.refresh(person)
+        assert person.points == 5  # 15 - 10
 
     @pytest.mark.asyncio
     async def test_non_admin_cannot_delete(self, client: AsyncClient, db: AsyncSession):

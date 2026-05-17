@@ -10,7 +10,7 @@ from .database import engine
 from .models import Base
 from .routers import auth, chores, people, points, log, config, theme, export, data_import, status, admin_db
 from .services.scheduler import start_scheduler, stop_scheduler
-from .services.chore_service import transition_overdue_chores
+from .services.chore_service import transition_overdue_chores, normalize_points_log_persons
 from .database import AsyncSessionLocal
 from .migrations import apply_migrations
 
@@ -28,6 +28,7 @@ async def lifespan(app: FastAPI):
     # Apply database migrations
     async with AsyncSessionLocal() as db:
         await apply_migrations(db)
+        await normalize_points_log_persons(db)
         await transition_overdue_chores(db)
 
     start_scheduler()

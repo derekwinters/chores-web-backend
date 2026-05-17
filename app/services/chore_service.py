@@ -4,7 +4,7 @@ import re
 from datetime import date, datetime, timezone
 from typing import Optional
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models import Chore, PointsLog, ChoreLog, Person
@@ -17,6 +17,26 @@ CHANGE_FORCED_DUE = "forced_due"
 CHANGE_MARKED_DUE = "marked_due"
 CHANGE_CREATED = "created"
 CHANGE_DELETED = "deleted"
+
+
+async def normalize_points_log_persons(db: AsyncSession) -> None:
+    """Normalize legacy PointsLog.person values from display name to username.
+
+    Old completions stored the person's display name (e.g. 'Derek').
+    New completions store the username (e.g. 'derek').
+    This runs at startup to bring all entries in line with the username convention.
+    Idempotent: safe to run on every startup.
+    """
+    people_result = await db.execute(select(Person))
+    people = people_result.scalars().all()
+    for person in people:
+        if person.name != person.username:
+            await db.execute(
+                update(PointsLog)
+                .where(PointsLog.person == person.name)
+                .values(person=person.username)
+            )
+    await db.commit()
 
 
 def _slugify(name: str) -> str:

@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
@@ -59,29 +59,31 @@ async def update_points_log(
     old_points = row.points
     old_person_name = row.person
 
-    # --- apply points delta to Person ---
-    delta = body.points - old_points
-    if delta != 0:
-        person_result = await db.execute(
-            select(Person).where(Person.name == old_person_name)
-        )
-        person_obj = person_result.scalar_one_or_none()
-        if person_obj is not None:
-            person_obj.points = max(0, person_obj.points + delta)
+    def _person_lookup(name: str):
+        """Match by username or display name — handles legacy rows that stored display name."""
+        return or_(Person.username == name, Person.name == name)
 
-    # If person name changed, rebalance both sides
-    if body.person != old_person_name:
-        # Remove old points from old person
+    if body.person == old_person_name:
+        # Same person — apply delta only
+        delta = body.points - old_points
+        if delta != 0:
+            person_result = await db.execute(
+                select(Person).where(_person_lookup(old_person_name))
+            )
+            person_obj = person_result.scalar_one_or_none()
+            if person_obj is not None:
+                person_obj.points = max(0, person_obj.points + delta)
+    else:
+        # Person changed — rebalance both sides (no delta block to avoid double-adjustment)
         old_person_result = await db.execute(
-            select(Person).where(Person.name == old_person_name)
+            select(Person).where(_person_lookup(old_person_name))
         )
         old_person_obj = old_person_result.scalar_one_or_none()
         if old_person_obj is not None:
             old_person_obj.points = max(0, old_person_obj.points - old_points)
 
-        # Add new points to new person
         new_person_result = await db.execute(
-            select(Person).where(Person.name == body.person)
+            select(Person).where(_person_lookup(body.person))
         )
         new_person_obj = new_person_result.scalar_one_or_none()
         if new_person_obj is not None:
@@ -133,7 +135,7 @@ async def delete_points_log(
 
     # Reverse points on person (floor at 0)
     person_result = await db.execute(
-        select(Person).where(Person.name == row.person)
+        select(Person).where(or_(Person.username == row.person, Person.name == row.person))
     )
     person_obj = person_result.scalar_one_or_none()
     if person_obj is not None:
