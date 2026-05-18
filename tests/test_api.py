@@ -488,6 +488,31 @@ class TestChoresAPI:
         assert r.json()["last_completed_by"] == "testuser"
 
     @pytest.mark.asyncio
+    async def test_complete_with_completed_by_uses_specified_person(self, authenticated_client):
+        r = await authenticated_client.post("/people", json={"name": "Alice", "username": "alice"})
+        assert r.status_code == 201
+
+        r = await authenticated_client.post("/chores", json=WEEKLY_CHORE)
+        chore_id = r.json()["id"]
+        await authenticated_client.post(f"/chores/{chore_id}/mark-due")
+
+        # Complete with explicit completed_by — should credit alice, not testuser
+        r = await authenticated_client.post(f"/chores/{chore_id}/complete", json={"completed_by": "alice"})
+        assert r.status_code == 200
+        assert r.json()["last_completed_by"] == "alice"
+
+    @pytest.mark.asyncio
+    async def test_complete_without_completed_by_falls_back_to_auth_user(self, authenticated_client):
+        r = await authenticated_client.post("/chores", json=WEEKLY_CHORE)
+        chore_id = r.json()["id"]
+        await authenticated_client.post(f"/chores/{chore_id}/mark-due")
+
+        # No completed_by — falls back to current_user (testuser)
+        r = await authenticated_client.post(f"/chores/{chore_id}/complete", json={})
+        assert r.status_code == 200
+        assert r.json()["last_completed_by"] == "testuser"
+
+    @pytest.mark.asyncio
     async def test_open_chore_clears_assignee_after_completion(self, authenticated_client):
         r = await authenticated_client.post("/people", json={"name": "Alice", "username": "alice"})
         assert r.status_code == 201
