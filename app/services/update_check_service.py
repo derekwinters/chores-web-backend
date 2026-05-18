@@ -21,13 +21,14 @@ _version_cache = {
 }
 
 
-async def _get_github_latest_version(timeout: int = 5) -> Optional[str]:
+async def _get_github_latest_version(timeout: int = 5, force: bool = False) -> Optional[str]:
     """Fetch the latest release version from GitHub API with caching."""
     now = datetime.utcnow()
 
-    # Check if cache is still valid
+    # Check if cache is still valid (bypassed when force=True)
     if (
-        _version_cache["latest_version"] is not None
+        not force
+        and _version_cache["latest_version"] is not None
         and _version_cache["cached_at"] is not None
         and (now - _version_cache["cached_at"]).total_seconds() < _version_cache["cache_ttl_seconds"]
     ):
@@ -55,7 +56,7 @@ async def _get_github_latest_version(timeout: int = 5) -> Optional[str]:
         return None
 
 
-async def check_for_updates(db: AsyncSession) -> Optional[str]:
+async def check_for_updates(db: AsyncSession, force: bool = False) -> Optional[str]:
     """Check for updates and return latest version if available."""
     result = await db.execute(select(UpdateCheck).limit(1))
     update_check = result.scalar_one_or_none()
@@ -73,8 +74,8 @@ async def check_for_updates(db: AsyncSession) -> Optional[str]:
         update_check.current_version = APP_VERSION
         await db.commit()
 
-    # Check if enough time has passed since last check
-    if update_check.last_checked_at:
+    # Check if enough time has passed since last check (bypassed when force=True)
+    if not force and update_check.last_checked_at:
         time_since_check = datetime.utcnow() - update_check.last_checked_at.replace(tzinfo=None)
         if time_since_check.total_seconds() < update_check.check_interval_hours * 3600:
             logger.debug("Update check skipped (interval not yet reached)")
@@ -85,8 +86,8 @@ async def check_for_updates(db: AsyncSession) -> Optional[str]:
         logger.debug("Update checking is disabled")
         return update_check.latest_version
 
-    # Fetch latest version from GitHub
-    latest_version = await _get_github_latest_version()
+    # Fetch latest version from GitHub (force bypasses in-memory version cache)
+    latest_version = await _get_github_latest_version(force=force)
 
     # Update the record
     update_check.latest_version = latest_version

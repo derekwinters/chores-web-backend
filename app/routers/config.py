@@ -162,7 +162,7 @@ async def trigger_update_check(
     db: AsyncSession = Depends(get_db),
 ):
     """Manually trigger an update check (admin only)."""
-    await check_for_updates(db)
+    await check_for_updates(db, force=True)
     return await get_update_status(db)
 
 

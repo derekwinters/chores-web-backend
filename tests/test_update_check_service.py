@@ -1,6 +1,7 @@
 """Tests for update check service."""
 import pytest
 from datetime import datetime, timedelta
+from unittest.mock import AsyncMock, patch
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -9,6 +10,7 @@ from app.services.update_check_service import (
     check_for_updates,
     get_update_status,
     configure_update_check,
+    _version_cache,
 )
 
 
@@ -154,3 +156,75 @@ async def test_version_comparison_ignores_same_version(db: AsyncSession):
 
     # Verify no update is available
     assert status["update_available"] is False
+
+
+# --- Behaviors from issue #261 ---
+
+@pytest.mark.asyncio
+async def test_check_for_updates_accepts_force_param(db: AsyncSession):
+    """Behavior 1: check_for_updates accepts force: bool = False param."""
+    with patch(
+        "app.services.update_check_service._get_github_latest_version",
+        new_callable=AsyncMock,
+        return_value="1.0.0",
+    ):
+        # Should not raise TypeError
+        await check_for_updates(db, force=False)
+        await check_for_updates(db, force=True)
+
+
+@pytest.mark.asyncio
+async def test_check_for_updates_force_bypasses_db_interval_guard(db: AsyncSession):
+    """Behavior 2: force=True skips DB interval guard."""
+    # Record with last check 1 hour ago — within 24h interval, so normally skipped
+    initial_time = datetime.utcnow() - timedelta(hours=1)
+    update_check = UpdateCheck(
+        current_version="1.0.0",
+        check_enabled=True,
+        check_interval_hours=24,
+        last_checked_at=initial_time,
+        latest_version="1.0.0",
+    )
+    db.add(update_check)
+    await db.commit()
+
+    with patch(
+        "app.services.update_check_service._get_github_latest_version",
+        new_callable=AsyncMock,
+        return_value="2.0.0",
+    ) as mock_fetch:
+        await check_for_updates(db, force=True)
+        mock_fetch.assert_called_once()  # Real fetch happened despite recent check
+
+    # last_checked_at must have been updated
+    result = await db.execute(select(UpdateCheck).limit(1))
+    record = result.scalar_one_or_none()
+    time_since_initial = (record.last_checked_at.replace(tzinfo=None) - initial_time).total_seconds()
+    assert time_since_initial > 0  # Updated beyond initial_time
+
+
+@pytest.mark.asyncio
+async def test_check_for_updates_force_bypasses_version_cache(db: AsyncSession):
+    """Behavior 3: force=True skips in-memory _version_cache TTL check."""
+    # Pre-populate cache as if a fresh fetch just happened
+    _version_cache["latest_version"] = "1.0.0"
+    _version_cache["cached_at"] = datetime.utcnow()  # Cache is fresh
+
+    update_check = UpdateCheck(
+        current_version="1.0.0",
+        check_enabled=True,
+        check_interval_hours=1,
+        last_checked_at=datetime.utcnow() - timedelta(hours=25),  # Old enough to pass interval
+        latest_version="1.0.0",
+    )
+    db.add(update_check)
+    await db.commit()
+
+    with patch(
+        "app.services.update_check_service._get_github_latest_version",
+        new_callable=AsyncMock,
+        return_value="2.0.0",
+    ) as mock_fetch:
+        await check_for_updates(db, force=True)
+        # Must have called _get_github_latest_version even though cache was fresh
+        mock_fetch.assert_called_once()

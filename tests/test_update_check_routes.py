@@ -1,6 +1,7 @@
 """Tests for update check API endpoints."""
 import pytest
 from fastapi.testclient import TestClient
+from unittest.mock import AsyncMock, patch
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.main import app
@@ -77,3 +78,31 @@ async def test_configure_update_check_with_query_params(db: AsyncSession):
     # This would be tested in integration tests
     # Verify the endpoint accepts query parameters
     pass
+
+
+@pytest.mark.asyncio
+async def test_trigger_update_check_calls_with_force_true(authenticated_client):
+    """Behavior 4: trigger_update_check router endpoint calls check_for_updates(db, force=True)."""
+    with patch(
+        "app.routers.config.check_for_updates",
+        new_callable=AsyncMock,
+        return_value=None,
+    ) as mock_check, patch(
+        "app.routers.config.get_update_status",
+        new_callable=AsyncMock,
+        return_value={
+            "current_version": APP_VERSION,
+            "latest_version": APP_VERSION,
+            "last_checked_at": None,
+            "check_enabled": True,
+            "check_interval_hours": 24,
+            "update_available": False,
+        },
+    ):
+        response = await authenticated_client.post("/config/updates/check")
+        assert response.status_code == 200
+
+        # Must have been called with force=True
+        mock_check.assert_called_once()
+        _, kwargs = mock_check.call_args
+        assert kwargs.get("force") is True
