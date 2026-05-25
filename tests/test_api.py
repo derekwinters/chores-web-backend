@@ -699,52 +699,48 @@ class TestPointsAPI:
         assert summary[0]["points_30d"] == 0
 
     @pytest.mark.asyncio
-    async def test_points_summary_includes_all_people(self, authenticated_client):
-        await authenticated_client.post("/people", json={"name": "Alice", "username": "alice"})
-        await authenticated_client.post("/people", json={"name": "Bob", "username": "bob"})
-        r = await authenticated_client.get("/points/summary")
+    async def test_points_summary_includes_all_people(self, seeded_client):
+        ac, db = seeded_client
+        r = await ac.get("/points/summary")
         assert r.status_code == 200
         names = [e["person"] for e in r.json()]
-        assert "alice" in names
-        assert "bob" in names
-        assert "testuser" in names
+        assert "derek" in names
+        assert "amy" in names
+        assert "connor" in names
+        assert "lucas" in names
 
     @pytest.mark.asyncio
-    async def test_points_summary_counts_recent(self, authenticated_client):
-        await authenticated_client.post("/people", json={"name": "Alice", "username": "alice"})
-        r = await authenticated_client.post("/chores", json=WEEKLY_CHORE)
-        chore_id = r.json()["id"]
-        await authenticated_client.post(f"/chores/{chore_id}/mark-due")
-        await authenticated_client.post(f"/chores/{chore_id}/complete", json={})
-
-        r = await authenticated_client.get("/points/summary")
-        testuser = next(e for e in r.json() if e["person"] == "testuser")
-        assert testuser["points_7d"] == 5
-        assert testuser["points_30d"] == 5
+    async def test_points_summary_counts_recent(self, seeded_client):
+        ac, db = seeded_client
+        # seeded_db provides derek: 10pts 3d ago (within 7d), 20pts 15d ago (within 30d only)
+        r = await ac.get("/points/summary")
+        assert r.status_code == 200
+        derek = next(e for e in r.json() if e["person"] == "derek")
+        assert derek["points_7d"] == 10
+        assert derek["points_30d"] == 30
 
     @pytest.mark.asyncio
-    async def test_points_summary_zero_for_no_activity(self, authenticated_client):
-        await authenticated_client.post("/people", json={"name": "Bob", "username": "bob"})
-        r = await authenticated_client.get("/points/summary")
-        bob = next(e for e in r.json() if e["person"] == "bob")
-        assert bob["points_7d"] == 0
-        assert bob["points_30d"] == 0
+    async def test_points_summary_zero_for_no_activity(self, seeded_client):
+        ac, db = seeded_client
+        # Amy has no PointsLog entries in seeded_db
+        r = await ac.get("/points/summary")
+        assert r.status_code == 200
+        amy = next(e for e in r.json() if e["person"] == "amy")
+        assert amy["points_7d"] == 0
+        assert amy["points_30d"] == 0
 
     @pytest.mark.asyncio
-    async def test_user_stats_returns_nonzero_after_completion(self, authenticated_client):
-        """user_stats should return correct non-zero points_7d and points_30d."""
-        r = await authenticated_client.post("/chores", json=WEEKLY_CHORE)
-        chore_id = r.json()["id"]
-        await authenticated_client.post(f"/chores/{chore_id}/mark-due")
-        await authenticated_client.post(f"/chores/{chore_id}/complete", json={})
-
-        r = await authenticated_client.get("/points/stats/testuser")
+    async def test_user_stats_returns_nonzero_after_completion(self, seeded_client):
+        """user_stats should return correct non-zero points_7d and points_30d using seeded data."""
+        ac, db = seeded_client
+        # seeded_db provides derek: 10pts 3d ago (within 7d), 20pts 15d ago (within 30d only)
+        r = await ac.get("/points/stats/derek")
         assert r.status_code == 200
         data = r.json()
-        assert data["points_7d"] == 5
-        assert data["points_30d"] == 5
-        assert data["total_points"] == 5
-        assert data["display_points"] == 5
+        assert data["points_7d"] == 10
+        assert data["points_30d"] == 30
+        assert data["total_points"] == 30
+        assert data["display_points"] == 30
 
     @pytest.mark.asyncio
     async def test_user_stats_excludes_old_entries(self, authenticated_client, db):
@@ -1061,3 +1057,5 @@ class TestUserLogAPI:
         reassign_log = next(e for e in logs if e["action"] == "reassigned")
         # Should be the requesting user, not "system"
         assert reassign_log["person"] == "testuser"
+
+
