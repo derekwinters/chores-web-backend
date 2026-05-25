@@ -5,10 +5,11 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette_prometheus import PrometheusMiddleware
 
 from .database import engine
 from .models import Base
-from .routers import auth, chores, people, points, log, config, theme, export, data_import, status, admin_db
+from .routers import auth, chores, people, points, log, config, theme, export, data_import, status, admin_db, metrics
 from .services.scheduler import start_scheduler, stop_scheduler
 from .services.chore_service import transition_overdue_chores, normalize_points_log_persons
 from .database import AsyncSessionLocal
@@ -52,6 +53,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(PrometheusMiddleware)
 
 
 @app.exception_handler(Exception)
@@ -75,6 +77,8 @@ app.include_router(export.router)
 app.include_router(data_import.router)
 app.include_router(status.router)
 app.include_router(admin_db.router)
+# Metrics router registered without auth dependency — public endpoint
+app.include_router(metrics.router)
 
 
 @app.get("/health")
