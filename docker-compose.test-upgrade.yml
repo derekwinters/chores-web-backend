@@ -1,0 +1,89 @@
+# Upgrade regression test orchestration.
+#
+# Validates that data seeded against the previous release migrates correctly
+# when the new backend starts against the same Postgres volume.
+#
+# Usage (CI resolves PREV_TAG dynamically; local example shown below):
+#
+#   export PREV_TAG=1.6.0
+#   docker compose -f docker-compose.test-upgrade.yml up --build -d && docker compose -f docker-compose.test-upgrade.yml wait validate
+#
+# Services:
+#   db         — Postgres (volume kept between old and new backend starts)
+#   old-backend — Previous release backend image (seeds data)
+#   seed       — Runs seed.py against the old backend
+#   new-backend — Current branch backend image (applies migrations)
+#   validate   — Runs validate_upgrade.py against the new backend
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: chores
+      POSTGRES_USER: chores
+      POSTGRES_PASSWORD: chores
+    volumes:
+      - upgrade-test-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chores"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  old-backend:
+    image: ghcr.io/derekwinters/chores-web/backend:${PREV_TAG}
+    environment:
+      DATABASE_URL: postgresql+asyncpg://chores:chores@db/chores
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\" || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  seed:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: python seed.py --base-url http://old-backend:8000
+    environment:
+      DATABASE_URL: postgresql+asyncpg://chores:chores@db/chores
+    depends_on:
+      old-backend:
+        condition: service_healthy
+    restart: "no"
+
+  new-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql+asyncpg://chores:chores@db/chores
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\" || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    restart: "no"
+
+  validate:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: python validate_upgrade.py --base-url http://new-backend:8000
+    environment:
+      DATABASE_URL: postgresql+asyncpg://chores:chores@db/chores
+    depends_on:
+      new-backend:
+        condition: service_healthy
+    restart: "no"
+
+volumes:
+  upgrade-test-postgres:
