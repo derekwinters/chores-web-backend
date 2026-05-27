@@ -40,13 +40,13 @@ class PersonCreate(BaseModel):
     name: str
     username: str
     password: Optional[str] = None
-    color: Optional[str] = None
+    color: Optional[str] = None  # TODO: Remove color field in next major version
 
 
 class PersonUpdate(BaseModel):
     name: Optional[str] = None
     username: Optional[str] = None
-    color: Optional[str] = None
+    color: Optional[str] = None  # TODO: Remove color field in next major version
     goal_7d: Optional[int] = None
     goal_30d: Optional[int] = None
     is_admin: Optional[bool] = None

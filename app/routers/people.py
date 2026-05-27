@@ -35,7 +35,7 @@ async def create_person(body: PersonCreate, current_user: str = Depends(require_
         username=body.username,
         password_hash=hash_password(body.password or ""),
         is_admin=False,
-        color=body.color or "#3B82F6"
+        color=body.color or "#3B82F6"  # TODO: Remove color field in next major version
     )
     db.add(person)
     await db.commit()
@@ -57,7 +57,7 @@ async def update_person(person_id: int, body: PersonUpdate, current_user: str = 
             raise HTTPException(status_code=409, detail="Username already exists")
 
     # Loggable fields: capture old values before mutation
-    loggable_fields = ["name", "username", "color", "goal_7d", "goal_30d", "is_admin", "preferred_theme"]
+    loggable_fields = ["name", "username", "color", "goal_7d", "goal_30d", "is_admin", "preferred_theme"]  # TODO: Remove color field in next major version
     old_values = {f: getattr(person, f) for f in loggable_fields}
 
     updates = {
