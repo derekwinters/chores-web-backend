@@ -41,10 +41,21 @@ async def _periodic_update_check() -> None:
         logger.debug("Update check completed")
 
 
-def start_scheduler() -> None:
+def reschedule_transition(hour: int, tz: str) -> None:
+    """Reschedule the overdue-chore transition job to run at the given hour in the given timezone."""
     scheduler.add_job(
         _midnight_transition,
-        CronTrigger(hour=0, minute=0),
+        CronTrigger(hour=hour, minute=0, timezone=tz),
+        id="midnight_transition",
+        replace_existing=True,
+    )
+    logger.info("Rescheduled midnight_transition to %02d:00 %s", hour, tz)
+
+
+def start_scheduler(due_hour: int = 6, timezone: str = "UTC") -> None:
+    scheduler.add_job(
+        _midnight_transition,
+        CronTrigger(hour=due_hour, minute=0, timezone=timezone),
         id="midnight_transition",
         replace_existing=True,
     )
@@ -61,7 +72,7 @@ def start_scheduler() -> None:
         replace_existing=True,
     )
     scheduler.start()
-    logger.info("Scheduler started")
+    logger.info("Scheduler started (due_hour=%d, timezone=%s)", due_hour, timezone)
 
 
 def stop_scheduler() -> None:

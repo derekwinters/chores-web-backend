@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 from datetime import date
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
@@ -34,6 +36,8 @@ from ..services.chore_service import (
 )
 from ..services.logging import log_chore_change
 from ..dependencies import get_current_user
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/chores",
@@ -177,7 +181,19 @@ async def create_chore(body: ChoreCreate, current_user: str = Depends(get_curren
         person=current_user,
         db=db,
     )
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError as e:
+        await db.rollback()
+        if e.orig and "UniqueViolationError" in type(e.orig).__name__:
+            logger.warning("Chore '%s' already exists (unique constraint violation)", body.name)
+            raise HTTPException(status_code=409, detail="Chore with that name already exists")
+        logger.exception("Unexpected integrity error creating chore '%s'", body.name)
+        raise HTTPException(status_code=500, detail="Database error while creating chore")
+    except Exception:
+        await db.rollback()
+        logger.exception("Unexpected error creating chore '%s'", body.name)
+        raise
     return _enrich(chore)
 
 
@@ -313,8 +329,20 @@ async def update_chore(chore_id: int, body: ChoreUpdate, current_user: str = Dep
             )
 
     db.add(chore)
-    await db.commit()
-    await db.refresh(chore)
+    try:
+        await db.commit()
+        await db.refresh(chore)
+    except IntegrityError as e:
+        await db.rollback()
+        if e.orig and "UniqueViolationError" in type(e.orig).__name__:
+            logger.warning("Unique constraint violation updating chore id=%s", chore_id)
+            raise HTTPException(status_code=409, detail="Chore with that name already exists")
+        logger.exception("Unexpected integrity error updating chore id=%s", chore_id)
+        raise HTTPException(status_code=500, detail="Database error while updating chore")
+    except Exception:
+        await db.rollback()
+        logger.exception("Unexpected error updating chore id=%s", chore_id)
+        raise
     return _enrich(chore)
 
 
@@ -329,7 +357,19 @@ async def delete_chore(chore_id: int, current_user: str = Depends(get_current_us
         db=db,
     )
     await db.delete(chore)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError as e:
+        await db.rollback()
+        if e.orig and "UniqueViolationError" in type(e.orig).__name__:
+            logger.warning("Unique constraint violation deleting chore id=%s", chore_id)
+            raise HTTPException(status_code=409, detail="Conflict deleting chore")
+        logger.exception("Unexpected integrity error deleting chore id=%s", chore_id)
+        raise HTTPException(status_code=500, detail="Database error while deleting chore")
+    except Exception:
+        await db.rollback()
+        logger.exception("Unexpected error deleting chore id=%s", chore_id)
+        raise
 
 
 @router.post("/{chore_id}/complete", response_model=ChoreOut)

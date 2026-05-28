@@ -203,3 +203,97 @@ async def test_update_config_multiple_fields(authenticated_client: AsyncClient):
     assert data["title"] == "New Title"
     assert data["timezone"] == "Asia/Tokyo"
     assert data["due_soon_days"] == 10
+
+
+# ── due_time_hour tests ───────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_get_config_default_due_time_hour(authenticated_client: AsyncClient):
+    """GET /config returns due_time_hour defaulting to 6."""
+    r = await authenticated_client.get("/config")
+    assert r.status_code == 200
+    assert r.json()["due_time_hour"] == 6
+
+
+@pytest.mark.asyncio
+async def test_get_config_custom_due_time_hour(authenticated_client: AsyncClient, db: AsyncSession):
+    """GET /config returns stored due_time_hour when set."""
+    db.add(Settings(key="due_time_hour", value="14"))
+    await db.commit()
+
+    r = await authenticated_client.get("/config")
+    assert r.status_code == 200
+    assert r.json()["due_time_hour"] == 14
+
+
+@pytest.mark.asyncio
+async def test_update_config_due_time_hour(authenticated_client: AsyncClient):
+    """PUT /config saves due_time_hour and returns it."""
+    r = await authenticated_client.put("/config", json={"due_time_hour": 8})
+    assert r.status_code == 200
+    assert r.json()["due_time_hour"] == 8
+
+    # Verify persistence
+    r = await authenticated_client.get("/config")
+    assert r.status_code == 200
+    assert r.json()["due_time_hour"] == 8
+
+
+@pytest.mark.asyncio
+async def test_update_config_due_time_hour_boundary_low(authenticated_client: AsyncClient):
+    """PUT /config accepts due_time_hour=0 (midnight)."""
+    r = await authenticated_client.put("/config", json={"due_time_hour": 0})
+    assert r.status_code == 200
+    assert r.json()["due_time_hour"] == 0
+
+
+@pytest.mark.asyncio
+async def test_update_config_due_time_hour_boundary_high(authenticated_client: AsyncClient):
+    """PUT /config accepts due_time_hour=23 (11 PM)."""
+    r = await authenticated_client.put("/config", json={"due_time_hour": 23})
+    assert r.status_code == 200
+    assert r.json()["due_time_hour"] == 23
+
+
+@pytest.mark.asyncio
+async def test_update_config_due_time_hour_invalid_low(authenticated_client: AsyncClient):
+    """PUT /config rejects due_time_hour below 0."""
+    r = await authenticated_client.put("/config", json={"due_time_hour": -1})
+    assert r.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_update_config_due_time_hour_invalid_high(authenticated_client: AsyncClient):
+    """PUT /config rejects due_time_hour above 23."""
+    r = await authenticated_client.put("/config", json={"due_time_hour": 24})
+    assert r.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_update_config_due_time_hour_reschedules_transition(authenticated_client: AsyncClient):
+    """PUT /config with due_time_hour reschedules the transition job."""
+    from unittest.mock import patch
+    with patch("app.routers.config.reschedule_transition") as mock_reschedule:
+        r = await authenticated_client.put("/config", json={"due_time_hour": 7})
+        assert r.status_code == 200
+        mock_reschedule.assert_called_once_with(7, "UTC")
+
+
+@pytest.mark.asyncio
+async def test_update_config_timezone_reschedules_transition(authenticated_client: AsyncClient):
+    """PUT /config with timezone reschedules the transition job."""
+    from unittest.mock import patch
+    with patch("app.routers.config.reschedule_transition") as mock_reschedule:
+        r = await authenticated_client.put("/config", json={"timezone": "America/Chicago"})
+        assert r.status_code == 200
+        mock_reschedule.assert_called_once_with(6, "America/Chicago")
+
+
+@pytest.mark.asyncio
+async def test_update_config_title_does_not_reschedule(authenticated_client: AsyncClient):
+    """PUT /config with only title does NOT reschedule the transition job."""
+    from unittest.mock import patch
+    with patch("app.routers.config.reschedule_transition") as mock_reschedule:
+        r = await authenticated_client.put("/config", json={"title": "New Title"})
+        assert r.status_code == 200
+        mock_reschedule.assert_not_called()

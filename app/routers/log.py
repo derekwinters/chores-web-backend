@@ -1,7 +1,9 @@
+import logging
 from datetime import datetime, date, timedelta
 from typing import Optional
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, delete
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 
@@ -9,6 +11,8 @@ from ..database import get_db
 from ..models import ChoreLog, UserLog
 from ..schemas import ChoreLogOut
 from ..dependencies import get_current_user, require_admin
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/log", tags=["log"])
 
@@ -112,6 +116,18 @@ async def set_retention(
     cutoff_date = datetime.now() - timedelta(days=_log_retention_days)
     await db.execute(delete(ChoreLog).where(ChoreLog.timestamp < cutoff_date))
     await db.execute(delete(UserLog).where(UserLog.timestamp < cutoff_date))
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError as e:
+        await db.rollback()
+        if e.orig and "UniqueViolationError" in type(e.orig).__name__:
+            logger.warning("Unique constraint violation setting log retention")
+            raise HTTPException(status_code=409, detail="Conflict setting log retention")
+        logger.exception("Unexpected integrity error setting log retention")
+        raise HTTPException(status_code=500, detail="Database error while setting log retention")
+    except Exception:
+        await db.rollback()
+        logger.exception("Unexpected error setting log retention")
+        raise
 
     return RetentionSettings(retention_days=_log_retention_days)

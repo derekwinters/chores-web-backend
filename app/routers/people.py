@@ -1,7 +1,9 @@
+import logging
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select, delete
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
@@ -10,6 +12,8 @@ from ..schemas import PersonCreate, PersonOut, PersonUpdate, PersonRedemption, R
 from ..dependencies import get_current_user, require_admin
 from ..security import hash_password
 from ..services.logging import log_person_change
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/people", tags=["people"])
 
@@ -38,8 +42,20 @@ async def create_person(body: PersonCreate, current_user: str = Depends(require_
         color=body.color or "#3B82F6"  # TODO: Remove color field in next major version
     )
     db.add(person)
-    await db.commit()
-    await db.refresh(person)
+    try:
+        await db.commit()
+        await db.refresh(person)
+    except IntegrityError as e:
+        await db.rollback()
+        if e.orig and "UniqueViolationError" in type(e.orig).__name__:
+            logger.warning("Person '%s' or username '%s' already exists", body.name, body.username)
+            raise HTTPException(status_code=409, detail="Person already exists")
+        logger.exception("Unexpected integrity error creating person '%s'", body.name)
+        raise HTTPException(status_code=500, detail="Database error while creating person")
+    except Exception:
+        await db.rollback()
+        logger.exception("Unexpected error creating person '%s'", body.name)
+        raise
     return person
 
 
@@ -104,8 +120,20 @@ async def update_person(person_id: int, body: PersonUpdate, current_user: str = 
                 new_value=None if new_val is None else str(new_val),
             )
 
-    await db.commit()
-    await db.refresh(person)
+    try:
+        await db.commit()
+        await db.refresh(person)
+    except IntegrityError as e:
+        await db.rollback()
+        if e.orig and "UniqueViolationError" in type(e.orig).__name__:
+            logger.warning("Unique constraint violation updating person id=%s", person_id)
+            raise HTTPException(status_code=409, detail="Username already exists")
+        logger.exception("Unexpected integrity error updating person id=%s", person_id)
+        raise HTTPException(status_code=500, detail="Database error while updating person")
+    except Exception:
+        await db.rollback()
+        logger.exception("Unexpected error updating person id=%s", person_id)
+        raise
     return person
 
 
@@ -116,7 +144,19 @@ async def delete_person(person_id: int, current_user: str = Depends(require_admi
     if not person:
         raise HTTPException(status_code=404, detail="Person not found")
     await db.delete(person)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError as e:
+        await db.rollback()
+        if e.orig and "UniqueViolationError" in type(e.orig).__name__:
+            logger.warning("Unique constraint violation deleting person id=%s", person_id)
+            raise HTTPException(status_code=409, detail="Conflict deleting person")
+        logger.exception("Unexpected integrity error deleting person id=%s", person_id)
+        raise HTTPException(status_code=500, detail="Database error while deleting person")
+    except Exception:
+        await db.rollback()
+        logger.exception("Unexpected error deleting person id=%s", person_id)
+        raise
 
 
 @router.post("/{person_id}/redeem", response_model=PersonOut)
@@ -148,8 +188,20 @@ async def redeem_points(person_id: int, body: PersonRedemption, current_user: st
         timestamp=datetime.now(timezone.utc)
     )
     db.add(redemption)
-    await db.commit()
-    await db.refresh(person)
+    try:
+        await db.commit()
+        await db.refresh(person)
+    except IntegrityError as e:
+        await db.rollback()
+        if e.orig and "UniqueViolationError" in type(e.orig).__name__:
+            logger.warning("Unique constraint violation redeeming points for person id=%s", person_id)
+            raise HTTPException(status_code=409, detail="Conflict redeeming points")
+        logger.exception("Unexpected integrity error redeeming points for person id=%s", person_id)
+        raise HTTPException(status_code=500, detail="Database error while redeeming points")
+    except Exception:
+        await db.rollback()
+        logger.exception("Unexpected error redeeming points for person id=%s", person_id)
+        raise
     return person
 
 

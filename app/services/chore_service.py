@@ -1,14 +1,19 @@
 from __future__ import annotations
 
+import logging
 import re
 from datetime import date, datetime, timezone
 from typing import Optional
 
+from fastapi import HTTPException
 from sqlalchemy import select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models import Chore, PointsLog, ChoreLog, Person
 from ..scheduling import build_schedule
+
+logger = logging.getLogger(__name__)
 
 CHANGE_COMPLETED = "completed"
 CHANGE_SKIPPED = "skipped"
@@ -36,7 +41,16 @@ async def normalize_points_log_persons(db: AsyncSession) -> None:
                 .where(PointsLog.person == person.name)
                 .values(person=person.username)
             )
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError as e:
+        await db.rollback()
+        logger.exception("Integrity error normalizing points log persons")
+        raise
+    except Exception:
+        await db.rollback()
+        logger.exception("Unexpected error normalizing points log persons")
+        raise
 
 
 def _slugify(name: str) -> str:
@@ -232,8 +246,20 @@ async def initialize_chore(chore: Chore, db: AsyncSession) -> None:
         chore.state = "complete"
 
     db.add(chore)
-    await db.commit()
-    await db.refresh(chore)
+    try:
+        await db.commit()
+        await db.refresh(chore)
+    except IntegrityError as e:
+        await db.rollback()
+        if e.orig and "UniqueViolationError" in type(e.orig).__name__:
+            logger.warning("Chore '%s' already exists (unique constraint violation)", chore.name)
+            raise HTTPException(status_code=409, detail="Chore with that name already exists")
+        logger.exception("Unexpected integrity error initializing chore '%s'", chore.name)
+        raise HTTPException(status_code=500, detail="Database error while creating chore")
+    except Exception:
+        await db.rollback()
+        logger.exception("Unexpected error initializing chore '%s'", chore.name)
+        raise
 
 
 async def complete_chore(
@@ -278,8 +304,20 @@ async def complete_chore(
     await _log_action(chore, CHANGE_COMPLETED, completed_by or "system", db, assignee=chore_assignee)
 
     db.add(chore)
-    await db.commit()
-    await db.refresh(chore)
+    try:
+        await db.commit()
+        await db.refresh(chore)
+    except IntegrityError as e:
+        await db.rollback()
+        if e.orig and "UniqueViolationError" in type(e.orig).__name__:
+            logger.warning("Integrity error completing chore id=%s", chore.id)
+            raise HTTPException(status_code=409, detail="Conflict completing chore")
+        logger.exception("Unexpected integrity error completing chore id=%s", chore.id)
+        raise HTTPException(status_code=500, detail="Database error while completing chore")
+    except Exception:
+        await db.rollback()
+        logger.exception("Unexpected error completing chore id=%s", chore.id)
+        raise
     return chore
 
 
@@ -293,8 +331,20 @@ async def skip_chore(chore: Chore, db: AsyncSession, skipped_by: Optional[str] =
     await _log_action(chore, CHANGE_SKIPPED, skipped_by or "system", db)
 
     db.add(chore)
-    await db.commit()
-    await db.refresh(chore)
+    try:
+        await db.commit()
+        await db.refresh(chore)
+    except IntegrityError as e:
+        await db.rollback()
+        if e.orig and "UniqueViolationError" in type(e.orig).__name__:
+            logger.warning("Integrity error skipping chore id=%s", chore.id)
+            raise HTTPException(status_code=409, detail="Conflict skipping chore")
+        logger.exception("Unexpected integrity error skipping chore id=%s", chore.id)
+        raise HTTPException(status_code=500, detail="Database error while skipping chore")
+    except Exception:
+        await db.rollback()
+        logger.exception("Unexpected error skipping chore id=%s", chore.id)
+        raise
     return chore
 
 
@@ -325,8 +375,20 @@ async def skip_and_reassign_chore(
         )
 
     db.add(chore)
-    await db.commit()
-    await db.refresh(chore)
+    try:
+        await db.commit()
+        await db.refresh(chore)
+    except IntegrityError as e:
+        await db.rollback()
+        if e.orig and "UniqueViolationError" in type(e.orig).__name__:
+            logger.warning("Integrity error in skip_and_reassign for chore id=%s", chore.id)
+            raise HTTPException(status_code=409, detail="Conflict during skip and reassign")
+        logger.exception("Unexpected integrity error in skip_and_reassign for chore id=%s", chore.id)
+        raise HTTPException(status_code=500, detail="Database error while skipping and reassigning chore")
+    except Exception:
+        await db.rollback()
+        logger.exception("Unexpected error in skip_and_reassign for chore id=%s", chore.id)
+        raise
     return chore
 
 
@@ -341,8 +403,20 @@ async def reassign_chore(chore: Chore, db: AsyncSession, assignee: str, person: 
     await _log_action(chore, CHANGE_REASSIGNED, person, db, reassigned_to=assignee)
 
     db.add(chore)
-    await db.commit()
-    await db.refresh(chore)
+    try:
+        await db.commit()
+        await db.refresh(chore)
+    except IntegrityError as e:
+        await db.rollback()
+        if e.orig and "UniqueViolationError" in type(e.orig).__name__:
+            logger.warning("Integrity error reassigning chore id=%s", chore.id)
+            raise HTTPException(status_code=409, detail="Conflict reassigning chore")
+        logger.exception("Unexpected integrity error reassigning chore id=%s", chore.id)
+        raise HTTPException(status_code=500, detail="Database error while reassigning chore")
+    except Exception:
+        await db.rollback()
+        logger.exception("Unexpected error reassigning chore id=%s", chore.id)
+        raise
     return chore
 
 
@@ -360,8 +434,20 @@ async def mark_due_chore(chore: Chore, db: AsyncSession, marked_by: Optional[str
     await _log_action(chore, CHANGE_MARKED_DUE, marked_by or "system", db)
 
     db.add(chore)
-    await db.commit()
-    await db.refresh(chore)
+    try:
+        await db.commit()
+        await db.refresh(chore)
+    except IntegrityError as e:
+        await db.rollback()
+        if e.orig and "UniqueViolationError" in type(e.orig).__name__:
+            logger.warning("Integrity error marking chore id=%s as due", chore.id)
+            raise HTTPException(status_code=409, detail="Conflict marking chore as due")
+        logger.exception("Unexpected integrity error marking chore id=%s as due", chore.id)
+        raise HTTPException(status_code=500, detail="Database error while marking chore as due")
+    except Exception:
+        await db.rollback()
+        logger.exception("Unexpected error marking chore id=%s as due", chore.id)
+        raise
     return chore
 
 
@@ -379,5 +465,17 @@ async def transition_overdue_chores(db: AsyncSession) -> int:
         await _log_action(chore, CHANGE_MARKED_DUE, "schedule", db)
         db.add(chore)
     if chores:
-        await db.commit()
+        try:
+            await db.commit()
+        except IntegrityError as e:
+            await db.rollback()
+            if e.orig and "UniqueViolationError" in type(e.orig).__name__:
+                logger.warning("Integrity error during overdue chore transition")
+                raise
+            logger.exception("Unexpected integrity error during overdue chore transition")
+            raise
+        except Exception:
+            await db.rollback()
+            logger.exception("Unexpected error during overdue chore transition")
+            raise
     return len(chores)

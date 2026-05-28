@@ -32,7 +32,12 @@ async def lifespan(app: FastAPI):
         await normalize_points_log_persons(db)
         await transition_overdue_chores(db)
 
-    start_scheduler()
+    async with AsyncSessionLocal() as db:
+        from .routers.config import _get_due_time_hour, _get_timezone
+        due_hour = await _get_due_time_hour(db)
+        tz = await _get_timezone(db)
+
+    start_scheduler(due_hour=due_hour, timezone=tz)
     yield
     stop_scheduler()
 

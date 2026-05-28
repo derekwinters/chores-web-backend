@@ -227,6 +227,7 @@ class ConfigUpdate(BaseModel):
     auth_enabled: Optional[bool] = None
     timezone: Optional[str] = None
     due_soon_days: Optional[int] = None
+    due_time_hour: Optional[int] = None
     update_check_enabled: Optional[bool] = None
     update_check_interval: Optional[int] = None
 
@@ -235,6 +236,13 @@ class ConfigUpdate(BaseModel):
     def validate_due_soon_days(cls, v):
         if v is not None and (v < 1 or v > 365):
             raise ValueError("due_soon_days must be between 1 and 365")
+        return v
+
+    @field_validator("due_time_hour")
+    @classmethod
+    def validate_due_time_hour(cls, v):
+        if v is not None and (v < 0 or v > 23):
+            raise ValueError("due_time_hour must be between 0 and 23")
         return v
 
     @field_validator("update_check_interval")
@@ -250,6 +258,7 @@ class ConfigOut(BaseModel):
     auth_enabled: bool
     timezone: str
     due_soon_days: int
+    due_time_hour: int
     update_check_enabled: bool
     update_check_interval: int
 
