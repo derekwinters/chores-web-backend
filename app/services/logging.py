@@ -1,8 +1,9 @@
 import logging
 import json
 from datetime import datetime, timezone
+from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
-from ..models import ChoreLog, UserLog
+from ..models import ChoreLog, UserLog, AuthLog
 
 logger = logging.getLogger(__name__)
 
@@ -100,6 +101,39 @@ async def log_person_change(
         field_name=field_name,
         old_value=old_value,
         new_value=new_value,
+        changed_by=changed_by,
+        timestamp=timestamp,
+    )
+    db.add(log)
+
+
+async def log_auth_event(
+    username: str,
+    action: str,
+    db: AsyncSession,
+    changed_by: Optional[str] = None,
+) -> None:
+    """Log an authentication event to the auth_log table.
+
+    Actions: login_succeeded, login_failed, password_changed, password_reset, user_created.
+    username is always the affected user (or attempted username for login_failed).
+    changed_by is the actor (admin username, 'system', or None for self-service).
+    """
+    timestamp = datetime.now(timezone.utc)
+
+    log_entry = {
+        "timestamp": timestamp.isoformat(),
+        "username": username,
+        "action": action,
+    }
+    if changed_by is not None:
+        log_entry["changed_by"] = changed_by
+
+    logger.info(json.dumps(log_entry))
+
+    log = AuthLog(
+        username=username,
+        action=action,
         changed_by=changed_by,
         timestamp=timestamp,
     )

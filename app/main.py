@@ -71,17 +71,20 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 
-app.include_router(auth.router)
-app.include_router(chores.router)
-app.include_router(people.router)
-app.include_router(points.router)
-app.include_router(log.router)
-app.include_router(config.router)
-app.include_router(theme.router)
-app.include_router(export.router)
-app.include_router(data_import.router)
+V1_PREFIX = "/v1"
+
+app.include_router(auth.router, prefix=V1_PREFIX)
+app.include_router(chores.router, prefix=V1_PREFIX)
+app.include_router(people.router, prefix=V1_PREFIX)
+app.include_router(points.router, prefix=V1_PREFIX)
+app.include_router(log.router, prefix=V1_PREFIX)
+app.include_router(config.router, prefix=V1_PREFIX)
+app.include_router(theme.router, prefix=V1_PREFIX)
+app.include_router(export.router, prefix=V1_PREFIX)
+app.include_router(data_import.router, prefix=V1_PREFIX)
+app.include_router(admin_db.router, prefix=V1_PREFIX)
+# Status and metrics are unversioned — infrastructure, not API resources
 app.include_router(status.router)
-app.include_router(admin_db.router)
 # Metrics router registered without auth dependency — public endpoint
 app.include_router(metrics.router)
 

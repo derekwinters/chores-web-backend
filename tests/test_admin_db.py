@@ -60,7 +60,7 @@ async def _make_points_log(
 
 
 async def _token(client: AsyncClient, username: str, password: str) -> str:
-    r = await client.post("/auth/login", json={"username": username, "password": password})
+    r = await client.post("/v1/auth/login", json={"username": username, "password": password})
     return r.json()["access_token"]
 
 
@@ -76,7 +76,7 @@ class TestListPointsLog:
         await _make_points_log(db, person_name="Bob", points=8)
 
         token = await _token(client, "admin", "adminpass")
-        r = await client.get("/admin/db/points-log", headers={"Authorization": f"Bearer {token}"})
+        r = await client.get("/v1/admin/db/points-log", headers={"Authorization": f"Bearer {token}"})
 
         assert r.status_code == 200
         data = r.json()
@@ -91,14 +91,14 @@ class TestListPointsLog:
         await _make_normal_user(db)
 
         token = await _token(client, "user", "userpass")
-        r = await client.get("/admin/db/points-log", headers={"Authorization": f"Bearer {token}"})
+        r = await client.get("/v1/admin/db/points-log", headers={"Authorization": f"Bearer {token}"})
 
         assert r.status_code == 403
 
     @pytest.mark.asyncio
     async def test_unauthenticated_rejected(self, client: AsyncClient, db: AsyncSession):
         await _make_admin(db)
-        r = await client.get("/admin/db/points-log")
+        r = await client.get("/v1/admin/db/points-log")
         assert r.status_code == 401
 
     @pytest.mark.asyncio
@@ -109,7 +109,7 @@ class TestListPointsLog:
 
         token = await _token(client, "admin", "adminpass")
         r = await client.get(
-            "/admin/db/points-log?limit=2&offset=1",
+            "/v1/admin/db/points-log?limit=2&offset=1",
             headers={"Authorization": f"Bearer {token}"},
         )
         assert r.status_code == 200
@@ -126,7 +126,7 @@ class TestListPointsLog:
         row2 = await _make_points_log(db, points=2)
 
         token = await _token(client, "admin", "adminpass")
-        r = await client.get("/admin/db/points-log", headers={"Authorization": f"Bearer {token}"})
+        r = await client.get("/v1/admin/db/points-log", headers={"Authorization": f"Bearer {token}"})
         items = r.json()["items"]
         # Newest entry (row2) should be first
         assert items[0]["id"] == row2.id
@@ -149,7 +149,7 @@ class TestUpdatePointsLog:
 
         token = await _token(client, "admin", "adminpass")
         r = await client.patch(
-            f"/admin/db/points-log/{row.id}",
+            f"/v1/admin/db/points-log/{row.id}",
             json={"points": 7, "person": "alice"},
             headers={"Authorization": f"Bearer {token}"},
         )
@@ -168,7 +168,7 @@ class TestUpdatePointsLog:
 
         token = await _token(client, "admin", "adminpass")
         await client.patch(
-            f"/admin/db/points-log/{row.id}",
+            f"/v1/admin/db/points-log/{row.id}",
             json={"points": 3, "person": "alice"},
             headers={"Authorization": f"Bearer {token}"},
         )
@@ -187,7 +187,7 @@ class TestUpdatePointsLog:
         await _make_admin(db)
         token = await _token(client, "admin", "adminpass")
         r = await client.patch(
-            "/admin/db/points-log/99999",
+            "/v1/admin/db/points-log/99999",
             json={"points": 5, "person": "Nobody"},
             headers={"Authorization": f"Bearer {token}"},
         )
@@ -201,7 +201,7 @@ class TestUpdatePointsLog:
 
         token = await _token(client, "user", "userpass")
         r = await client.patch(
-            f"/admin/db/points-log/{row.id}",
+            f"/v1/admin/db/points-log/{row.id}",
             json={"points": 1, "person": "Alice"},
             headers={"Authorization": f"Bearer {token}"},
         )
@@ -220,7 +220,7 @@ class TestUpdatePointsLog:
 
         token = await _token(client, "admin", "adminpass")
         r = await client.patch(
-            f"/admin/db/points-log/{row.id}",
+            f"/v1/admin/db/points-log/{row.id}",
             json={"points": 7, "person": "alice"},
             headers={"Authorization": f"Bearer {token}"},
         )
@@ -242,7 +242,7 @@ class TestUpdatePointsLog:
 
         token = await _token(client, "admin", "adminpass")
         r = await client.patch(
-            f"/admin/db/points-log/{row.id}",
+            f"/v1/admin/db/points-log/{row.id}",
             json={"points": 10, "person": "bob"},
             headers={"Authorization": f"Bearer {token}"},
         )
@@ -266,7 +266,7 @@ class TestUpdatePointsLog:
 
         token = await _token(client, "admin", "adminpass")
         r = await client.patch(
-            f"/admin/db/points-log/{row.id}",
+            f"/v1/admin/db/points-log/{row.id}",
             json={"points": 5, "person": "bob"},
             headers={"Authorization": f"Bearer {token}"},
         )
@@ -284,7 +284,7 @@ class TestUpdatePointsLog:
 
         token = await _token(client, "admin", "adminpass")
         r = await client.patch(
-            f"/admin/db/points-log/{row.id}",
+            f"/v1/admin/db/points-log/{row.id}",
             json={"points": 5, "person": "ghost"},
             headers={"Authorization": f"Bearer {token}"},
         )
@@ -304,7 +304,7 @@ class TestUpdatePointsLog:
 
         token = await _token(client, "admin", "adminpass")
         r = await client.patch(
-            f"/admin/db/points-log/{row.id}",
+            f"/v1/admin/db/points-log/{row.id}",
             json={"points": 6, "person": "Alice"},
             headers={"Authorization": f"Bearer {token}"},
         )
@@ -329,7 +329,7 @@ class TestDeletePointsLog:
 
         token = await _token(client, "admin", "adminpass")
         r = await client.delete(
-            f"/admin/db/points-log/{row.id}",
+            f"/v1/admin/db/points-log/{row.id}",
             headers={"Authorization": f"Bearer {token}"},
         )
         assert r.status_code == 204
@@ -350,7 +350,7 @@ class TestDeletePointsLog:
 
         token = await _token(client, "admin", "adminpass")
         await client.delete(
-            f"/admin/db/points-log/{row.id}",
+            f"/v1/admin/db/points-log/{row.id}",
             headers={"Authorization": f"Bearer {token}"},
         )
 
@@ -368,7 +368,7 @@ class TestDeletePointsLog:
 
         token = await _token(client, "admin", "adminpass")
         await client.delete(
-            f"/admin/db/points-log/{row.id}",
+            f"/v1/admin/db/points-log/{row.id}",
             headers={"Authorization": f"Bearer {token}"},
         )
 
@@ -382,7 +382,7 @@ class TestDeletePointsLog:
 
         token = await _token(client, "admin", "adminpass")
         await client.delete(
-            f"/admin/db/points-log/{row.id}",
+            f"/v1/admin/db/points-log/{row.id}",
             headers={"Authorization": f"Bearer {token}"},
         )
 
@@ -399,7 +399,7 @@ class TestDeletePointsLog:
         await _make_admin(db)
         token = await _token(client, "admin", "adminpass")
         r = await client.delete(
-            "/admin/db/points-log/99999",
+            "/v1/admin/db/points-log/99999",
             headers={"Authorization": f"Bearer {token}"},
         )
         assert r.status_code == 404
@@ -416,7 +416,7 @@ class TestDeletePointsLog:
 
         token = await _token(client, "admin", "adminpass")
         r = await client.delete(
-            f"/admin/db/points-log/{row.id}",
+            f"/v1/admin/db/points-log/{row.id}",
             headers={"Authorization": f"Bearer {token}"},
         )
         assert r.status_code == 204
@@ -436,7 +436,7 @@ class TestDeletePointsLog:
 
         token = await _token(client, "admin", "adminpass")
         r = await client.delete(
-            f"/admin/db/points-log/{row.id}",
+            f"/v1/admin/db/points-log/{row.id}",
             headers={"Authorization": f"Bearer {token}"},
         )
         assert r.status_code == 204
@@ -451,7 +451,7 @@ class TestDeletePointsLog:
 
         token = await _token(client, "user", "userpass")
         r = await client.delete(
-            f"/admin/db/points-log/{row.id}",
+            f"/v1/admin/db/points-log/{row.id}",
             headers={"Authorization": f"Bearer {token}"},
         )
         assert r.status_code == 403

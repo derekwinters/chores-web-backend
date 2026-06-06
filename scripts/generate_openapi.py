@@ -1,0 +1,51 @@
+#!/usr/bin/env python3
+"""Generate the OpenAPI JSON snapshot for the chores-web API.
+
+Usage:
+    cd backend
+    python ../scripts/generate_openapi.py [--output ../docs/api/openapi.json]
+
+The output file is committed to the repo as the golden snapshot.
+The CI job runs this script and uses oasdiff to detect breaking changes
+against the committed snapshot.
+
+Breaking Change Ritual (also documented in CLAUDE.md):
+1. Increment the API_VERSION file at repo root.
+2. Mount new routes under /api/v{N}/ alongside old ones.
+3. Re-run this script to update docs/api/openapi.json.
+"""
+import argparse
+import json
+import os
+import sys
+
+# Add the backend directory to sys.path so we can import the app
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+BACKEND_DIR = os.path.join(SCRIPT_DIR, "..", "backend")
+sys.path.insert(0, BACKEND_DIR)
+
+# Set a dummy JWT_SECRET so Settings() doesn't fail (no .env in CI)
+os.environ.setdefault("JWT_SECRET", "openapi-snapshot-generation-key")
+os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///./snapshot.db")
+
+from app.main import app  # noqa: E402 — must come after sys.path manipulation
+
+
+def generate(output_path: str) -> None:
+    schema = app.openapi()
+    os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+    with open(output_path, "w") as f:
+        json.dump(schema, f, indent=2)
+        f.write("\n")
+    print(f"OpenAPI snapshot written to {output_path}")
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Generate OpenAPI snapshot")
+    parser.add_argument(
+        "--output",
+        default=os.path.join(SCRIPT_DIR, "..", "docs", "api", "openapi.json"),
+        help="Output path for the OpenAPI JSON snapshot",
+    )
+    args = parser.parse_args()
+    generate(args.output)

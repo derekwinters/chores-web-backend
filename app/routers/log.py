@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 
 from ..database import get_db
-from ..models import ChoreLog, UserLog
+from ..models import ChoreLog, UserLog, AuthLog
 from ..schemas import ChoreLogOut
 from ..dependencies import get_current_user, require_admin
 
@@ -116,6 +116,7 @@ async def set_retention(
     cutoff_date = datetime.now() - timedelta(days=_log_retention_days)
     await db.execute(delete(ChoreLog).where(ChoreLog.timestamp < cutoff_date))
     await db.execute(delete(UserLog).where(UserLog.timestamp < cutoff_date))
+    await db.execute(delete(AuthLog).where(AuthLog.timestamp < cutoff_date))
     try:
         await db.commit()
     except IntegrityError as e:

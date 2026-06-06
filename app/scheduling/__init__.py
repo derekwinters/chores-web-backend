@@ -3,10 +3,12 @@ from .schedule import (
     WeeklySchedule,
     MonthlySchedule,
     IntervalSchedule,
+    YearlySchedule,
     build_schedule,
     SCHEDULE_WEEKLY,
     SCHEDULE_MONTHLY,
     SCHEDULE_INTERVAL,
+    SCHEDULE_YEARLY,
 )
 
 __all__ = [
@@ -14,8 +16,10 @@ __all__ = [
     "WeeklySchedule",
     "MonthlySchedule",
     "IntervalSchedule",
+    "YearlySchedule",
     "build_schedule",
     "SCHEDULE_WEEKLY",
     "SCHEDULE_MONTHLY",
     "SCHEDULE_INTERVAL",
+    "SCHEDULE_YEARLY",
 ]

@@ -59,7 +59,7 @@ async def check_health(c: httpx.AsyncClient) -> None:
 
 async def check_people(c: httpx.AsyncClient) -> None:
     print("Checking /people...")
-    r = await c.get("/people")
+    r = await c.get("/v1/people")
     if r.status_code != 200:
         fail(f"/people returned {r.status_code}")
         return
@@ -80,7 +80,7 @@ async def check_people(c: httpx.AsyncClient) -> None:
 async def check_chores(c: httpx.AsyncClient) -> int:
     """Returns number of chores found."""
     print("Checking /chores...")
-    r = await c.get("/chores")
+    r = await c.get("/v1/chores")
     if r.status_code != 200:
         fail(f"/chores returned {r.status_code}")
         return 0
@@ -100,7 +100,7 @@ async def check_chores(c: httpx.AsyncClient) -> int:
 
 async def check_points(c: httpx.AsyncClient) -> None:
     print("Checking /points (leaderboard)...")
-    r = await c.get("/points")
+    r = await c.get("/v1/points")
     if r.status_code != 200:
         fail(f"/points returned {r.status_code}")
         return
@@ -113,7 +113,7 @@ async def check_points(c: httpx.AsyncClient) -> None:
 
 async def check_activity_log(c: httpx.AsyncClient) -> None:
     print("Checking /log for expected action types...")
-    r = await c.get("/log")
+    r = await c.get("/v1/log")
     if r.status_code != 200:
         fail(f"/log returned {r.status_code}")
         return
@@ -212,15 +212,34 @@ async def check_sql_integrity() -> None:
 async def validate(base_url: str = BASE) -> None:
     print(f"Running upgrade validation against {base_url}\n")
 
-    # Authenticate first
+    # Authenticate first — handle password reset required (403) from bcrypt migration
     async with httpx.AsyncClient(base_url=base_url, timeout=30) as c:
-        login_r = await c.post("/auth/login", json={"username": "admin", "password": "adminpass123"})
-        if login_r.status_code != 200:
+        login_r = await c.post("/v1/auth/login", json={"username": "admin", "password": "adminpass123"})
+        if login_r.status_code == 403:
+            body = login_r.json()
+            reset_token = body.get("reset_token") or (body.get("detail", {}) or {}).get("reset_token")
+            if reset_token:
+                reset_r = await c.put(
+                    "/v1/auth/password/reset",
+                    json={"new_password": "adminpass123"},
+                    headers={"Authorization": f"Bearer {reset_token}"},
+                )
+                if reset_r.status_code != 200:
+                    fail(f"Password reset failed: {reset_r.status_code} {reset_r.text}")
+                    _report_results()
+                    return
+                token = reset_r.json()["access_token"]
+            else:
+                fail(f"Login failed: {login_r.status_code} {login_r.text}")
+                _report_results()
+                return
+        elif login_r.status_code != 200:
             fail(f"Login failed: {login_r.status_code} {login_r.text}")
             _report_results()
             return
+        else:
+            token = login_r.json()["access_token"]
 
-        token = login_r.json()["access_token"]
         c.headers.update({"Authorization": f"Bearer {token}"})
 
         await check_health(c)

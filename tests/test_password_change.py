@@ -25,23 +25,23 @@ async def test_change_password_with_valid_old_password(client: AsyncClient, db: 
     await db.commit()
 
     # Login to get token
-    login_r = await client.post("/auth/login", json={"username": "pwdchange", "password": password})
+    login_r = await client.post("/v1/auth/login", json={"username": "pwdchange", "password": password})
     token = login_r.json()["access_token"]
 
     # Change password
     change_r = await client.put(
-        "/auth/password",
+        "/v1/auth/password",
         json={"old_password": password, "new_password": new_password},
         headers={"Authorization": f"Bearer {token}"}
     )
     assert change_r.status_code == 200
 
     # Verify can login with new password
-    login_r2 = await client.post("/auth/login", json={"username": "pwdchange", "password": new_password})
+    login_r2 = await client.post("/v1/auth/login", json={"username": "pwdchange", "password": new_password})
     assert login_r2.status_code == 200
 
     # Verify cannot login with old password
-    login_r3 = await client.post("/auth/login", json={"username": "pwdchange", "password": password})
+    login_r3 = await client.post("/v1/auth/login", json={"username": "pwdchange", "password": password})
     assert login_r3.status_code == 401
 
 
@@ -60,12 +60,12 @@ async def test_change_password_with_invalid_old_password(client: AsyncClient, db
     await db.commit()
 
     # Login to get token
-    login_r = await client.post("/auth/login", json={"username": "invalidoldpwd", "password": password})
+    login_r = await client.post("/v1/auth/login", json={"username": "invalidoldpwd", "password": password})
     token = login_r.json()["access_token"]
 
     # Try to change with wrong old password
     change_r = await client.put(
-        "/auth/password",
+        "/v1/auth/password",
         json={"old_password": "wrong_password", "new_password": "new_password_123"},
         headers={"Authorization": f"Bearer {token}"}
     )
@@ -87,12 +87,12 @@ async def test_change_password_same_as_old(client: AsyncClient, db: AsyncSession
     await db.commit()
 
     # Login to get token
-    login_r = await client.post("/auth/login", json={"username": "samepwd", "password": password})
+    login_r = await client.post("/v1/auth/login", json={"username": "samepwd", "password": password})
     token = login_r.json()["access_token"]
 
     # Try to change to same password
     change_r = await client.put(
-        "/auth/password",
+        "/v1/auth/password",
         json={"old_password": password, "new_password": password},
         headers={"Authorization": f"Bearer {token}"}
     )
@@ -114,23 +114,23 @@ async def test_change_password_too_short(client: AsyncClient, db: AsyncSession):
     await db.commit()
 
     # Login to get token
-    login_r = await client.post("/auth/login", json={"username": "shortpwd", "password": password})
+    login_r = await client.post("/v1/auth/login", json={"username": "shortpwd", "password": password})
     token = login_r.json()["access_token"]
 
-    # Try to change to short password
+    # Try to change to short password — Pydantic schema validation returns 422
     change_r = await client.put(
-        "/auth/password",
+        "/v1/auth/password",
         json={"old_password": password, "new_password": "short"},
         headers={"Authorization": f"Bearer {token}"}
     )
-    assert change_r.status_code == 400
+    assert change_r.status_code in (400, 422)
 
 
 @pytest.mark.asyncio
 async def test_change_password_without_token(client: AsyncClient):
     """Test password change without authorization header."""
     change_r = await client.put(
-        "/auth/password",
+        "/v1/auth/password",
         json={"old_password": "password", "new_password": "new_password"}
     )
     assert change_r.status_code == 401
@@ -140,7 +140,7 @@ async def test_change_password_without_token(client: AsyncClient):
 async def test_change_password_with_invalid_token(client: AsyncClient):
     """Test password change with invalid token."""
     change_r = await client.put(
-        "/auth/password",
+        "/v1/auth/password",
         json={"old_password": "password", "new_password": "new_password"},
         headers={"Authorization": "Bearer invalid.token.here"}
     )

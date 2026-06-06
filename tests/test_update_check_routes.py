@@ -99,7 +99,7 @@ async def test_trigger_update_check_calls_with_force_true(authenticated_client):
             "update_available": False,
         },
     ):
-        response = await authenticated_client.post("/config/updates/check")
+        response = await authenticated_client.post("/v1/config/updates/check")
         assert response.status_code == 200
 
         # Must have been called with force=True

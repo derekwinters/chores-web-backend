@@ -56,7 +56,7 @@ async def seed_client(seed_db):
 async def _run_seed(ac: AsyncClient) -> dict:
     """Execute the seed workflow against the given client. Returns login token."""
     # Login step (first login auto-creates admin)
-    login_r = await ac.post("/auth/login", json={"username": "admin", "password": "adminpass123"})
+    login_r = await ac.post("/v1/auth/login", json={"username": "admin", "password": "adminpass123"})
     assert login_r.status_code == 200, f"Login failed: {login_r.text}"
     token = login_r.json()["access_token"]
     ac.headers = {"Authorization": f"Bearer {token}"}
@@ -76,7 +76,7 @@ async def test_seed_performs_login(seed_client):
     assert result["token"], "seed login did not return a token"
 
     # Token must allow authenticated requests
-    chores_r = await ac.get("/chores")
+    chores_r = await ac.get("/v1/chores")
     assert chores_r.status_code == 200
 
 
@@ -92,7 +92,7 @@ async def test_seed_creates_people_and_chores(seed_client):
 
     # Create people via API (as seed.py does)
     for name in ["Derek", "Amy", "Connor", "Lucas"]:
-        r = await ac.post("/people", json={"name": name, "username": name.lower(), "password": "pass1234"})
+        r = await ac.post("/v1/people", json={"name": name, "username": name.lower(), "password": "pass1234"})
         assert r.status_code in (200, 201), f"Person creation failed for {name}: {r.text}"
 
     # Verify people exist
@@ -110,7 +110,7 @@ async def test_seed_creates_people_and_chores(seed_client):
         "eligible_people": ["Derek", "Amy", "Connor", "Lucas"],
         "points": 3,
     }
-    r = await ac.post("/chores", json=chore_data)
+    r = await ac.post("/v1/chores", json=chore_data)
     assert r.status_code == 201, f"Chore creation failed: {r.text}"
 
     result = await db.execute(select(Chore))
@@ -129,8 +129,8 @@ async def test_seed_creates_completions(seed_client):
     await _run_seed(ac)
 
     # Create person and chore
-    await ac.post("/people", json={"name": "Derek", "username": "derek2", "password": "pass1234"})
-    chore_r = await ac.post("/chores", json={
+    await ac.post("/v1/people", json={"name": "Derek", "username": "derek2", "password": "pass1234"})
+    chore_r = await ac.post("/v1/chores", json={
         "name": "Test Completion Chore",
         "schedule_type": "interval",
         "schedule_config": {"days": 7},
@@ -141,9 +141,9 @@ async def test_seed_creates_completions(seed_client):
     chore_id = chore_r.json()["id"]
 
     # Force state to due so complete action is possible
-    await ac.put(f"/chores/{chore_id}", json={"state": "due"})
+    await ac.put(f"/v1/chores/{chore_id}", json={"state": "due"})
 
-    r = await ac.post(f"/chores/{chore_id}/complete", json={"completed_by": "admin"})
+    r = await ac.post(f"/v1/chores/{chore_id}/complete", json={"completed_by": "admin"})
     assert r.status_code == 200, f"Complete failed: {r.text}"
 
     result = await db.execute(select(PointsLog))
@@ -161,7 +161,7 @@ async def test_seed_creates_skips(seed_client):
     ac, db = seed_client
     await _run_seed(ac)
 
-    chore_r = await ac.post("/chores", json={
+    chore_r = await ac.post("/v1/chores", json={
         "name": "Skip Test Chore",
         "schedule_type": "interval",
         "schedule_config": {"days": 7},
@@ -170,9 +170,9 @@ async def test_seed_creates_skips(seed_client):
         "points": 2,
     })
     chore_id = chore_r.json()["id"]
-    await ac.put(f"/chores/{chore_id}", json={"state": "due"})
+    await ac.put(f"/v1/chores/{chore_id}", json={"state": "due"})
 
-    r = await ac.post(f"/chores/{chore_id}/skip")
+    r = await ac.post(f"/v1/chores/{chore_id}/skip")
     assert r.status_code == 200, f"Skip failed: {r.text}"
 
     result = await db.execute(select(ChoreLog).where(ChoreLog.action == "skipped"))
@@ -191,10 +191,10 @@ async def test_seed_creates_reassignments(seed_client):
     await _run_seed(ac)
 
     # Create two people for reassignment
-    await ac.post("/people", json={"name": "Alice", "username": "alice", "password": "pass1234"})
-    await ac.post("/people", json={"name": "Bob", "username": "bob", "password": "pass1234"})
+    await ac.post("/v1/people", json={"name": "Alice", "username": "alice", "password": "pass1234"})
+    await ac.post("/v1/people", json={"name": "Bob", "username": "bob", "password": "pass1234"})
 
-    chore_r = await ac.post("/chores", json={
+    chore_r = await ac.post("/v1/chores", json={
         "name": "Reassign Test Chore",
         "schedule_type": "interval",
         "schedule_config": {"days": 7},
@@ -205,7 +205,7 @@ async def test_seed_creates_reassignments(seed_client):
     })
     chore_id = chore_r.json()["id"]
 
-    r = await ac.post(f"/chores/{chore_id}/reassign", json={"assignee": "Bob"})
+    r = await ac.post(f"/v1/chores/{chore_id}/reassign", json={"assignee": "Bob"})
     assert r.status_code == 200, f"Reassign failed: {r.text}"
 
     result = await db.execute(select(ChoreLog).where(ChoreLog.action == "reassigned"))
@@ -224,7 +224,7 @@ async def test_seed_creates_amendments(seed_client):
     ac, db = seed_client
     await _run_seed(ac)
 
-    chore_r = await ac.post("/chores", json={
+    chore_r = await ac.post("/v1/chores", json={
         "name": "Amendment Test Chore",
         "schedule_type": "interval",
         "schedule_config": {"days": 7},
@@ -235,7 +235,7 @@ async def test_seed_creates_amendments(seed_client):
     chore_id = chore_r.json()["id"]
 
     # Amend points and schedule
-    r = await ac.put(f"/chores/{chore_id}", json={"points": 5})
+    r = await ac.put(f"/v1/chores/{chore_id}", json={"points": 5})
     assert r.status_code == 200, f"Amendment (PUT) failed: {r.text}"
 
     result = await db.execute(select(ChoreLog).where(ChoreLog.action == "updated"))

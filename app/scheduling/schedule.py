@@ -7,6 +7,7 @@ from typing import Optional
 SCHEDULE_WEEKLY = "weekly"
 SCHEDULE_MONTHLY = "monthly"
 SCHEDULE_INTERVAL = "interval"
+SCHEDULE_YEARLY = "yearly"
 
 WEEKDAY_MAP = {
     "monday": 0, "mon": 0,
@@ -212,6 +213,63 @@ class IntervalSchedule(Schedule):
         return f"Every {self.days} day{'s' if self.days != 1 else ''}"
 
 
+class YearlySchedule(Schedule):
+    """Yearly recurrence: same day/month each year, or Nth weekday of a specific month."""
+
+    MONTH_NAMES = [
+        "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December",
+    ]
+
+    def __init__(
+        self,
+        month: int,                                    # 1–12
+        day_of_month: Optional[int],                   # 1–28/29/30/31 or -1 for last
+        weekday_occurrence: Optional[tuple[int, int]], # (1-indexed week, 0-indexed weekday)
+    ) -> None:
+        super().__init__([], "skip")  # Conditions not supported for yearly schedules
+        self.month = month
+        self.day_of_month = day_of_month
+        self.weekday_occurrence = weekday_occurrence
+
+    def _occurrence_in_year(self, year: int) -> Optional[date]:
+        last_day = calendar.monthrange(year, self.month)[1]
+        if self.day_of_month is not None:
+            day = last_day if self.day_of_month == -1 else min(self.day_of_month, last_day)
+            return date(year, self.month, day)
+        if self.weekday_occurrence is not None:
+            week_num, weekday = self.weekday_occurrence
+            count = 0
+            for d in range(1, last_day + 1):
+                if date(year, self.month, d).weekday() == weekday:
+                    count += 1
+                    if count == week_num:
+                        return date(year, self.month, d)
+        return None
+
+    def next_occurrence_after(self, after: date) -> Optional[date]:
+        for year in range(after.year, after.year + 3):
+            candidate = self._occurrence_in_year(year)
+            if candidate is not None and candidate > after:
+                return candidate
+        return None
+
+    def summary(self) -> str:
+        month_name = self.MONTH_NAMES[self.month - 1]
+        if self.day_of_month is not None:
+            if self.day_of_month == -1:
+                return f"Yearly on the last day of {month_name}"
+            ordinals = {1: "1st", 2: "2nd", 3: "3rd"}
+            suffix = ordinals.get(self.day_of_month, f"{self.day_of_month}th")
+            return f"Yearly on {month_name} {suffix}"
+        if self.weekday_occurrence is not None:
+            week_num, weekday = self.weekday_occurrence
+            day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+            ordinals = ["1st", "2nd", "3rd", "4th", "5th"]
+            return f"Yearly on the {ordinals[week_num - 1]} {day_names[weekday]} of {month_name}"
+        return f"Yearly in {month_name}"
+
+
 def build_schedule(config: dict) -> Schedule:
     stype = config["type"]
     conditions = [build_condition(c) for c in config.get("conditions", [])]
@@ -241,5 +299,17 @@ def build_schedule(config: dict) -> Schedule:
         days_raw = config["days"]
         days = days_raw[0] if isinstance(days_raw, list) else days_raw
         return IntervalSchedule(int(days), conditions, failure)
+
+    if stype == SCHEDULE_YEARLY:
+        month = config["month"]
+        day_of_month = config.get("day_of_month")
+        weekday_occ = None
+        if "weekday_occurrence" in config:
+            wo = config["weekday_occurrence"]
+            wday = wo["weekday"]
+            if isinstance(wday, str):
+                wday = WEEKDAY_MAP[wday.lower()]
+            weekday_occ = (wo["week"], wday)
+        return YearlySchedule(month, day_of_month, weekday_occ)
 
     raise ValueError(f"Unknown schedule type: {stype!r}")

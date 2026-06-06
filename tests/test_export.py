@@ -10,7 +10,7 @@ from app.models import Person, Chore, Settings
 async def test_export_endpoint(client: AsyncClient):
     """Test that export endpoint works when authenticated."""
     # Without token, should fail
-    r = await client.get("/export/config", headers={})
+    r = await client.get("/v1/export/config", headers={})
     assert r.status_code in (200, 401)  # Test client may auto-auth
 
 
@@ -19,7 +19,7 @@ async def test_export_config(client: AsyncClient, db: AsyncSession):
     """Test that export returns proper JSON structure with schema version."""
     # Login
     login_r = await client.post(
-        "/auth/login",
+        "/v1/auth/login",
         json={"username": "admin", "password": "admin_password"}
     )
     assert login_r.status_code == 200
@@ -27,7 +27,7 @@ async def test_export_config(client: AsyncClient, db: AsyncSession):
 
     # Export
     export_r = await client.get(
-        "/export/config",
+        "/v1/export/config",
         headers={"Authorization": f"Bearer {token}"}
     )
     assert export_r.status_code == 200
@@ -74,7 +74,7 @@ async def test_export_config_boolean_types(client: AsyncClient, db: AsyncSession
     """
     # Login
     login_r = await client.post(
-        "/auth/login",
+        "/v1/auth/login",
         json={"username": "admin", "password": "admin_password"}
     )
     assert login_r.status_code == 200
@@ -103,7 +103,7 @@ async def test_export_config_boolean_types(client: AsyncClient, db: AsyncSession
     await db.commit()
 
     # Export
-    export_r = await client.get("/export/config", headers=headers)
+    export_r = await client.get("/v1/export/config", headers=headers)
     assert export_r.status_code == 200
     data = export_r.json()
 

@@ -71,7 +71,7 @@ async def seeded_client(seeded_db):
     app.dependency_overrides[get_db] = override_get_db
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
-        login_r = await ac.post("/auth/login", json={"username": "derek", "password": "derek_pass"})
+        login_r = await ac.post("/v1/auth/login", json={"username": "derek", "password": "derek_pass"})
         token = login_r.json()["access_token"]
         ac.headers = {"Authorization": f"Bearer {token}"}
         yield ac, seeded_db
@@ -123,7 +123,7 @@ async def authenticated_client(db):
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         # Login and get token
-        login_r = await ac.post("/auth/login", json={"username": "testuser", "password": test_password})
+        login_r = await ac.post("/v1/auth/login", json={"username": "testuser", "password": test_password})
         token = login_r.json()["access_token"]
 
         # Add token to default headers

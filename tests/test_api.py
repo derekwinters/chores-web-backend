@@ -23,38 +23,38 @@ ROTATING_CHORE = {
 class TestPeopleAPI:
     @pytest.mark.asyncio
     async def test_create_and_list(self, authenticated_client):
-        r = await authenticated_client.post("/people", json={"name": "Alice", "username": "alice"})
+        r = await authenticated_client.post("/v1/people", json={"name": "Alice", "username": "alice"})
         assert r.status_code == 201
         assert r.json()["name"] == "Alice"
 
-        r = await authenticated_client.get("/people")
+        r = await authenticated_client.get("/v1/people")
         assert r.status_code == 200
         assert any(p["name"] == "Alice" for p in r.json())
 
     @pytest.mark.asyncio
     async def test_duplicate_rejected(self, authenticated_client):
-        await authenticated_client.post("/people", json={"name": "Alice", "username": "alice"})
-        r = await authenticated_client.post("/people", json={"name": "Alice", "username": "alice2"})
+        await authenticated_client.post("/v1/people", json={"name": "Alice", "username": "alice"})
+        r = await authenticated_client.post("/v1/people", json={"name": "Alice", "username": "alice2"})
         assert r.status_code == 409
 
     @pytest.mark.asyncio
     async def test_delete_person(self, authenticated_client):
-        create_r = await authenticated_client.post("/people", json={"name": "Bob", "username": "bob"})
+        create_r = await authenticated_client.post("/v1/people", json={"name": "Bob", "username": "bob"})
         person_id = create_r.json()["id"]
-        r = await authenticated_client.delete(f"/people/{person_id}")
+        r = await authenticated_client.delete(f"/v1/people/{person_id}")
         assert r.status_code == 204
 
-        r = await authenticated_client.get("/people")
+        r = await authenticated_client.get("/v1/people")
         assert not any(p["name"] == "Bob" for p in r.json())
 
     @pytest.mark.asyncio
     async def test_delete_nonexistent(self, authenticated_client):
-        r = await authenticated_client.delete("/people/99999")
+        r = await authenticated_client.delete("/v1/people/99999")
         assert r.status_code == 404
 
     @pytest.mark.asyncio
     async def test_create_person_has_defaults(self, authenticated_client):
-        r = await authenticated_client.post("/people", json={"name": "Alex", "username": "alex"})
+        r = await authenticated_client.post("/v1/people", json={"name": "Alex", "username": "alex"})
         assert r.status_code == 201
         data = r.json()
         assert data["name"] == "Alex"
@@ -67,7 +67,7 @@ class TestPeopleAPI:
 
     @pytest.mark.asyncio
     async def test_person_has_username_field(self, authenticated_client):
-        r = await authenticated_client.post("/people", json={"name": "Charlie", "username": "charlie123"})
+        r = await authenticated_client.post("/v1/people", json={"name": "Charlie", "username": "charlie123"})
         assert r.status_code == 201
         data = r.json()
         assert data["username"] == "charlie123"
@@ -75,7 +75,7 @@ class TestPeopleAPI:
 
     @pytest.mark.asyncio
     async def test_person_has_is_admin_field(self, authenticated_client):
-        r = await authenticated_client.post("/people", json={"name": "David", "username": "david123"})
+        r = await authenticated_client.post("/v1/people", json={"name": "David", "username": "david123"})
         assert r.status_code == 201
         data = r.json()
         assert "is_admin" in data
@@ -83,13 +83,13 @@ class TestPeopleAPI:
 
     @pytest.mark.asyncio
     async def test_username_uniqueness_enforced(self, authenticated_client):
-        await authenticated_client.post("/people", json={"name": "Eve", "username": "eve123"})
-        r = await authenticated_client.post("/people", json={"name": "Frank", "username": "eve123"})
+        await authenticated_client.post("/v1/people", json={"name": "Eve", "username": "eve123"})
+        r = await authenticated_client.post("/v1/people", json={"name": "Frank", "username": "eve123"})
         assert r.status_code == 409  # Conflict - duplicate username
 
     @pytest.mark.asyncio
     async def test_person_has_points_field_with_default(self, authenticated_client):
-        r = await authenticated_client.post("/people", json={"name": "George", "username": "george123"})
+        r = await authenticated_client.post("/v1/people", json={"name": "George", "username": "george123"})
         assert r.status_code == 201
         data = r.json()
         assert "points" in data
@@ -97,7 +97,7 @@ class TestPeopleAPI:
 
     @pytest.mark.asyncio
     async def test_points_auto_update_on_chore_completion(self, authenticated_client):
-        chore_r = await authenticated_client.post("/chores", json={
+        chore_r = await authenticated_client.post("/v1/chores", json={
             "name": "Test Chore",
             "schedule_type": "interval",
             "schedule_config": {"days": 1},
@@ -106,28 +106,28 @@ class TestPeopleAPI:
         chore_id = chore_r.json()["id"]
 
         # Complete chore (points credited to authenticated user: testuser)
-        await authenticated_client.post(f"/chores/{chore_id}/complete", json={})
+        await authenticated_client.post(f"/v1/chores/{chore_id}/complete", json={})
 
         # Check testuser points updated
-        people_r = await authenticated_client.get(f"/people")
+        people_r = await authenticated_client.get(f"/v1/people")
         testuser = next((p for p in people_r.json() if p["username"] == "testuser"), None)
         assert testuser is not None
         assert testuser["points"] == 25
 
     @pytest.mark.asyncio
     async def test_points_cannot_be_manually_set(self, authenticated_client):
-        create_r = await authenticated_client.post("/people", json={"name": "Ivan", "username": "ivan"})
+        create_r = await authenticated_client.post("/v1/people", json={"name": "Ivan", "username": "ivan"})
         person_id = create_r.json()["id"]
 
         # Try to set points via update - should be ignored
-        r = await authenticated_client.put(f"/people/{person_id}", json={"points": 100})
+        r = await authenticated_client.put(f"/v1/people/{person_id}", json={"points": 100})
         assert r.status_code == 200
         # Points should still be 0 (not 100)
         assert r.json()["points"] == 0
 
     @pytest.mark.asyncio
     async def test_multiple_completions_accumulate_points(self, authenticated_client):
-        chore_r = await authenticated_client.post("/chores", json={
+        chore_r = await authenticated_client.post("/v1/chores", json={
             "name": "Test Chore",
             "schedule_type": "interval",
             "schedule_config": {"days": 1},
@@ -136,56 +136,56 @@ class TestPeopleAPI:
         chore_id = chore_r.json()["id"]
 
         # Complete twice (points credited to authenticated user: testuser)
-        await authenticated_client.post(f"/chores/{chore_id}/complete", json={})
-        await authenticated_client.post(f"/chores/{chore_id}/complete", json={})
+        await authenticated_client.post(f"/v1/chores/{chore_id}/complete", json={})
+        await authenticated_client.post(f"/v1/chores/{chore_id}/complete", json={})
 
         # Check total points for testuser
-        people_r = await authenticated_client.get(f"/people")
+        people_r = await authenticated_client.get(f"/v1/people")
         testuser = next((p for p in people_r.json() if p["username"] == "testuser"), None)
         assert testuser is not None
         assert testuser["points"] == 60
 
     @pytest.mark.asyncio
     async def test_redemption_history_empty(self, authenticated_client):
-        create_r = await authenticated_client.post("/people", json={"name": "Karen", "username": "karen"})
+        create_r = await authenticated_client.post("/v1/people", json={"name": "Karen", "username": "karen"})
         person_id = create_r.json()["id"]
 
-        r = await authenticated_client.get(f"/people/{person_id}/redemptions")
+        r = await authenticated_client.get(f"/v1/people/{person_id}/redemptions")
         assert r.status_code == 200
         assert r.json() == []
 
     @pytest.mark.asyncio
     async def test_redemption_history_not_found(self, authenticated_client):
-        r = await authenticated_client.get(f"/people/999/redemptions")
+        r = await authenticated_client.get(f"/v1/people/999/redemptions")
         assert r.status_code == 404
 
     @pytest.mark.asyncio
     async def test_redemption_history_after_redemption(self, authenticated_client):
         # Create and complete chore to earn points
-        chore_r = await authenticated_client.post("/chores", json={
+        chore_r = await authenticated_client.post("/v1/chores", json={
             "name": "Test",
             "schedule_type": "interval",
             "schedule_config": {"days": 1},
             "points": 50
         })
         chore_id = chore_r.json()["id"]
-        await authenticated_client.post(f"/chores/{chore_id}/complete", json={})
+        await authenticated_client.post(f"/v1/chores/{chore_id}/complete", json={})
 
         # Get testuser ID
-        people_r = await authenticated_client.get("/people")
+        people_r = await authenticated_client.get("/v1/people")
         testuser = next((p for p in people_r.json() if p["username"] == "testuser"), None)
         assert testuser is not None
         person_id = testuser["id"]
 
         # Redeem points
         redeem_r = await authenticated_client.post(
-            f"/people/{person_id}/redeem",
+            f"/v1/people/{person_id}/redeem",
             json={"amount": 25}
         )
         assert redeem_r.status_code == 200
 
         # Get history
-        history_r = await authenticated_client.get(f"/people/{person_id}/redemptions")
+        history_r = await authenticated_client.get(f"/v1/people/{person_id}/redemptions")
         assert history_r.status_code == 200
         redemptions = history_r.json()
         assert len(redemptions) == 1
@@ -197,28 +197,28 @@ class TestPeopleAPI:
     @pytest.mark.asyncio
     async def test_redemption_history_sorted_by_timestamp(self, authenticated_client):
         # Create and complete chore to earn points
-        chore_r = await authenticated_client.post("/chores", json={
+        chore_r = await authenticated_client.post("/v1/chores", json={
             "name": "Test",
             "schedule_type": "interval",
             "schedule_config": {"days": 1},
             "points": 100
         })
         chore_id = chore_r.json()["id"]
-        await authenticated_client.post(f"/chores/{chore_id}/complete", json={})
+        await authenticated_client.post(f"/v1/chores/{chore_id}/complete", json={})
 
         # Get testuser ID
-        people_r = await authenticated_client.get("/people")
+        people_r = await authenticated_client.get("/v1/people")
         testuser = next((p for p in people_r.json() if p["username"] == "testuser"), None)
         assert testuser is not None
         person_id = testuser["id"]
 
         # Multiple redemptions
-        await authenticated_client.post(f"/people/{person_id}/redeem", json={"amount": 10})
-        await authenticated_client.post(f"/people/{person_id}/redeem", json={"amount": 20})
-        await authenticated_client.post(f"/people/{person_id}/redeem", json={"amount": 15})
+        await authenticated_client.post(f"/v1/people/{person_id}/redeem", json={"amount": 10})
+        await authenticated_client.post(f"/v1/people/{person_id}/redeem", json={"amount": 20})
+        await authenticated_client.post(f"/v1/people/{person_id}/redeem", json={"amount": 15})
 
         # Get history
-        history_r = await authenticated_client.get(f"/people/{person_id}/redemptions")
+        history_r = await authenticated_client.get(f"/v1/people/{person_id}/redemptions")
         redemptions = history_r.json()
 
         assert len(redemptions) == 3
@@ -230,7 +230,7 @@ class TestPeopleAPI:
 class TestChoresAPI:
     @pytest.mark.asyncio
     async def test_create_chore(self, authenticated_client):
-        r = await authenticated_client.post("/chores", json=WEEKLY_CHORE)
+        r = await authenticated_client.post("/v1/chores", json=WEEKLY_CHORE)
         assert r.status_code == 201
         data = r.json()
         assert data["name"] == "Vacuum"
@@ -240,44 +240,44 @@ class TestChoresAPI:
 
     @pytest.mark.asyncio
     async def test_list_chores(self, authenticated_client):
-        await authenticated_client.post("/chores", json=WEEKLY_CHORE)
-        r = await authenticated_client.get("/chores")
+        await authenticated_client.post("/v1/chores", json=WEEKLY_CHORE)
+        r = await authenticated_client.get("/v1/chores")
         assert r.status_code == 200
         assert len(r.json()) == 1
 
     @pytest.mark.asyncio
     async def test_get_chore(self, authenticated_client):
-        create_r = await authenticated_client.post("/chores", json=WEEKLY_CHORE)
+        create_r = await authenticated_client.post("/v1/chores", json=WEEKLY_CHORE)
         chore_id = create_r.json()["id"]
-        r = await authenticated_client.get(f"/chores/{chore_id}")
+        r = await authenticated_client.get(f"/v1/chores/{chore_id}")
         assert r.status_code == 200
         assert r.json()["name"] == "Vacuum"
 
     @pytest.mark.asyncio
     async def test_get_nonexistent(self, authenticated_client):
-        r = await authenticated_client.get("/chores/99999")
+        r = await authenticated_client.get("/v1/chores/99999")
         assert r.status_code == 404
 
     @pytest.mark.asyncio
     async def test_duplicate_rejected(self, authenticated_client):
-        await authenticated_client.post("/chores", json=WEEKLY_CHORE)
-        r = await authenticated_client.post("/chores", json=WEEKLY_CHORE)
+        await authenticated_client.post("/v1/chores", json=WEEKLY_CHORE)
+        r = await authenticated_client.post("/v1/chores", json=WEEKLY_CHORE)
         assert r.status_code == 409
 
     @pytest.mark.asyncio
     async def test_update_chore(self, authenticated_client):
-        create_r = await authenticated_client.post("/chores", json=WEEKLY_CHORE)
+        create_r = await authenticated_client.post("/v1/chores", json=WEEKLY_CHORE)
         chore_id = create_r.json()["id"]
-        r = await authenticated_client.put(f"/chores/{chore_id}", json={"points": 10})
+        r = await authenticated_client.put(f"/v1/chores/{chore_id}", json={"points": 10})
         assert r.status_code == 200
         assert r.json()["points"] == 10
 
     @pytest.mark.asyncio
     async def test_update_fixed_assignee_updates_current_assignee(self, authenticated_client):
-        await authenticated_client.post("/people", json={"name": "Alice", "username": "alice"})
-        await authenticated_client.post("/people", json={"name": "Bob", "username": "bob"})
+        await authenticated_client.post("/v1/people", json={"name": "Alice", "username": "alice"})
+        await authenticated_client.post("/v1/people", json={"name": "Bob", "username": "bob"})
         create_r = await authenticated_client.post(
-            "/chores",
+            "/v1/chores",
             json={
                 "name": "Feed cat",
                 "schedule_type": "weekly",
@@ -289,7 +289,7 @@ class TestChoresAPI:
         )
         chore_id = create_r.json()["id"]
 
-        r = await authenticated_client.put(f"/chores/{chore_id}", json={"assignee": "Bob"})
+        r = await authenticated_client.put(f"/v1/chores/{chore_id}", json={"assignee": "Bob"})
         assert r.status_code == 200
         data = r.json()
         assert data["assignee"] == "Bob"
@@ -297,11 +297,11 @@ class TestChoresAPI:
 
     @pytest.mark.asyncio
     async def test_update_rotating_current_and_next_assignee(self, authenticated_client):
-        await authenticated_client.post("/people", json={"name": "Alice", "username": "alice"})
-        await authenticated_client.post("/people", json={"name": "Bob", "username": "bob"})
-        await authenticated_client.post("/people", json={"name": "Carol", "username": "carol"})
+        await authenticated_client.post("/v1/people", json={"name": "Alice", "username": "alice"})
+        await authenticated_client.post("/v1/people", json={"name": "Bob", "username": "bob"})
+        await authenticated_client.post("/v1/people", json={"name": "Carol", "username": "carol"})
         create_r = await authenticated_client.post(
-            "/chores",
+            "/v1/chores",
             json={
                 "name": "Laundry",
                 "schedule_type": "interval",
@@ -314,7 +314,7 @@ class TestChoresAPI:
         chore_id = create_r.json()["id"]
 
         r = await authenticated_client.put(
-            f"/chores/{chore_id}",
+            f"/v1/chores/{chore_id}",
             json={"current_assignee": "Bob", "next_assignee": "Carol"},
         )
         assert r.status_code == 200
@@ -325,9 +325,9 @@ class TestChoresAPI:
 
     @pytest.mark.asyncio
     async def test_unassign_open_chore(self, authenticated_client):
-        await authenticated_client.post("/people", json={"name": "Alice", "username": "alice"})
+        await authenticated_client.post("/v1/people", json={"name": "Alice", "username": "alice"})
         create_r = await authenticated_client.post(
-            "/chores",
+            "/v1/chores",
             json={
                 "name": "Dishes",
                 "schedule_type": "weekly",
@@ -340,7 +340,7 @@ class TestChoresAPI:
 
         # Assign to Alice
         r = await authenticated_client.put(
-            f"/chores/{chore_id}",
+            f"/v1/chores/{chore_id}",
             json={"current_assignee": "Alice"},
         )
         assert r.status_code == 200
@@ -348,14 +348,14 @@ class TestChoresAPI:
 
         # Unassign (set to null)
         r = await authenticated_client.put(
-            f"/chores/{chore_id}",
+            f"/v1/chores/{chore_id}",
             json={"current_assignee": None},
         )
         assert r.status_code == 200
         assert r.json()["current_assignee"] is None
 
         # Verify by fetching chore again
-        r = await authenticated_client.get(f"/chores/{chore_id}")
+        r = await authenticated_client.get(f"/v1/chores/{chore_id}")
         assert r.status_code == 200
         assert r.json()["current_assignee"] is None
 
@@ -364,20 +364,20 @@ class TestChoresAPI:
         from datetime import date, timedelta
 
         # Create a chore (will have next_due calculated from schedule)
-        create_r = await authenticated_client.post("/chores", json=WEEKLY_CHORE)
+        create_r = await authenticated_client.post("/v1/chores", json=WEEKLY_CHORE)
         chore_id = create_r.json()["id"]
         initial_state = create_r.json()["state"]
 
         # Update next_due to a past date (should set state to "due")
         past_date = (date.today() - timedelta(days=1)).isoformat()
-        r = await authenticated_client.put(f"/chores/{chore_id}", json={"next_due": past_date})
+        r = await authenticated_client.put(f"/v1/chores/{chore_id}", json={"next_due": past_date})
         assert r.status_code == 200
         assert r.json()["state"] == "due"
         assert r.json()["next_due"] == past_date
 
         # Update next_due to a future date (should reset state to "complete")
         future_date = (date.today() + timedelta(days=5)).isoformat()
-        r = await authenticated_client.put(f"/chores/{chore_id}", json={"next_due": future_date})
+        r = await authenticated_client.put(f"/v1/chores/{chore_id}", json={"next_due": future_date})
         assert r.status_code == 200
         assert r.json()["state"] == "complete"
         assert r.json()["next_due"] == future_date
@@ -387,16 +387,16 @@ class TestChoresAPI:
         from datetime import date, timedelta
 
         # Create a chore
-        create_r = await authenticated_client.post("/chores", json=WEEKLY_CHORE)
+        create_r = await authenticated_client.post("/v1/chores", json=WEEKLY_CHORE)
         chore_id = create_r.json()["id"]
 
         # First set to a future date
         future_date = (date.today() + timedelta(days=5)).isoformat()
-        await authenticated_client.put(f"/chores/{chore_id}", json={"next_due": future_date})
+        await authenticated_client.put(f"/v1/chores/{chore_id}", json={"next_due": future_date})
 
         # Update next_due to today (should set state to "due")
         today = date.today().isoformat()
-        r = await authenticated_client.put(f"/chores/{chore_id}", json={"next_due": today})
+        r = await authenticated_client.put(f"/v1/chores/{chore_id}", json={"next_due": today})
         assert r.status_code == 200
         assert r.json()["state"] == "due"
         assert r.json()["next_due"] == today
@@ -406,18 +406,18 @@ class TestChoresAPI:
         from datetime import date, timedelta
 
         # Create a chore
-        create_r = await authenticated_client.post("/chores", json=WEEKLY_CHORE)
+        create_r = await authenticated_client.post("/v1/chores", json=WEEKLY_CHORE)
         chore_id = create_r.json()["id"]
 
         # Set next_due to past date (state becomes "due")
         past_date = (date.today() - timedelta(days=2)).isoformat()
-        r = await authenticated_client.put(f"/chores/{chore_id}", json={"next_due": past_date})
+        r = await authenticated_client.put(f"/v1/chores/{chore_id}", json={"next_due": past_date})
         assert r.status_code == 200
         assert r.json()["state"] == "due"
 
         # Update next_due back to future (state should go back to "complete")
         future_date = (date.today() + timedelta(days=7)).isoformat()
-        r = await authenticated_client.put(f"/chores/{chore_id}", json={"next_due": future_date})
+        r = await authenticated_client.put(f"/v1/chores/{chore_id}", json={"next_due": future_date})
         assert r.status_code == 200
         assert r.json()["state"] == "complete"
         assert r.json()["next_due"] == future_date
@@ -427,12 +427,12 @@ class TestChoresAPI:
         from datetime import date, timedelta
 
         # Set up people for assignment test
-        await authenticated_client.post("/people", json={"name": "Alice", "username": "alice"})
-        await authenticated_client.post("/people", json={"name": "Bob", "username": "bob"})
+        await authenticated_client.post("/v1/people", json={"name": "Alice", "username": "alice"})
+        await authenticated_client.post("/v1/people", json={"name": "Bob", "username": "bob"})
 
         # Create a fixed assignment chore
         create_r = await authenticated_client.post(
-            "/chores",
+            "/v1/chores",
             json={
                 "name": "Feed cat",
                 "schedule_type": "weekly",
@@ -448,7 +448,7 @@ class TestChoresAPI:
         # Update both next_due to past date and assignee to Bob
         past_date = (date.today() - timedelta(days=1)).isoformat()
         r = await authenticated_client.put(
-            f"/chores/{chore_id}",
+            f"/v1/chores/{chore_id}",
             json={"next_due": past_date, "assignee": "Bob"},
         )
         assert r.status_code == 200
@@ -459,7 +459,7 @@ class TestChoresAPI:
 
         # Update to future date
         future_date = (date.today() + timedelta(days=5)).isoformat()
-        r = await authenticated_client.put(f"/chores/{chore_id}", json={"next_due": future_date})
+        r = await authenticated_client.put(f"/v1/chores/{chore_id}", json={"next_due": future_date})
         assert r.status_code == 200
         assert r.json()["state"] == "complete"
         assert r.json()["next_due"] == future_date
@@ -467,54 +467,54 @@ class TestChoresAPI:
 
     @pytest.mark.asyncio
     async def test_delete_chore(self, authenticated_client):
-        create_r = await authenticated_client.post("/chores", json=WEEKLY_CHORE)
+        create_r = await authenticated_client.post("/v1/chores", json=WEEKLY_CHORE)
         chore_id = create_r.json()["id"]
-        r = await authenticated_client.delete(f"/chores/{chore_id}")
+        r = await authenticated_client.delete(f"/v1/chores/{chore_id}")
         assert r.status_code == 204
 
-        r = await authenticated_client.get(f"/chores/{chore_id}")
+        r = await authenticated_client.get(f"/v1/chores/{chore_id}")
         assert r.status_code == 404
 
     @pytest.mark.asyncio
     async def test_complete_action(self, authenticated_client):
-        r = await authenticated_client.post("/chores", json=WEEKLY_CHORE)
+        r = await authenticated_client.post("/v1/chores", json=WEEKLY_CHORE)
         chore_id = r.json()["id"]
 
         # Force to due so we can complete it
-        await authenticated_client.post(f"/chores/{chore_id}/mark-due")
-        r = await authenticated_client.post(f"/chores/{chore_id}/complete", json={})
+        await authenticated_client.post(f"/v1/chores/{chore_id}/mark-due")
+        r = await authenticated_client.post(f"/v1/chores/{chore_id}/complete", json={})
         assert r.status_code == 200
         assert r.json()["state"] == "complete"
         assert r.json()["last_completed_by"] == "testuser"
 
     @pytest.mark.asyncio
     async def test_complete_with_completed_by_uses_specified_person(self, authenticated_client):
-        r = await authenticated_client.post("/people", json={"name": "Alice", "username": "alice"})
+        r = await authenticated_client.post("/v1/people", json={"name": "Alice", "username": "alice"})
         assert r.status_code == 201
 
-        r = await authenticated_client.post("/chores", json=WEEKLY_CHORE)
+        r = await authenticated_client.post("/v1/chores", json=WEEKLY_CHORE)
         chore_id = r.json()["id"]
-        await authenticated_client.post(f"/chores/{chore_id}/mark-due")
+        await authenticated_client.post(f"/v1/chores/{chore_id}/mark-due")
 
         # Complete with explicit completed_by — should credit alice, not testuser
-        r = await authenticated_client.post(f"/chores/{chore_id}/complete", json={"completed_by": "alice"})
+        r = await authenticated_client.post(f"/v1/chores/{chore_id}/complete", json={"completed_by": "alice"})
         assert r.status_code == 200
         assert r.json()["last_completed_by"] == "alice"
 
     @pytest.mark.asyncio
     async def test_complete_without_completed_by_falls_back_to_auth_user(self, authenticated_client):
-        r = await authenticated_client.post("/chores", json=WEEKLY_CHORE)
+        r = await authenticated_client.post("/v1/chores", json=WEEKLY_CHORE)
         chore_id = r.json()["id"]
-        await authenticated_client.post(f"/chores/{chore_id}/mark-due")
+        await authenticated_client.post(f"/v1/chores/{chore_id}/mark-due")
 
         # No completed_by — falls back to current_user (testuser)
-        r = await authenticated_client.post(f"/chores/{chore_id}/complete", json={})
+        r = await authenticated_client.post(f"/v1/chores/{chore_id}/complete", json={})
         assert r.status_code == 200
         assert r.json()["last_completed_by"] == "testuser"
 
     @pytest.mark.asyncio
     async def test_open_chore_clears_assignee_after_completion(self, authenticated_client):
-        r = await authenticated_client.post("/people", json={"name": "Alice", "username": "alice"})
+        r = await authenticated_client.post("/v1/people", json={"name": "Alice", "username": "alice"})
         assert r.status_code == 201
 
         open_chore = {
@@ -525,18 +525,18 @@ class TestChoresAPI:
             "eligible_people": [],
             "points": 0,
         }
-        r = await authenticated_client.post("/chores", json=open_chore)
+        r = await authenticated_client.post("/v1/chores", json=open_chore)
         chore_id = r.json()["id"]
 
         # Assign to an individual, then complete
-        await authenticated_client.put(f"/chores/{chore_id}", json={"current_assignee": "Alice"})
-        await authenticated_client.post(f"/chores/{chore_id}/mark-due")
-        r = await authenticated_client.post(f"/chores/{chore_id}/complete", json={})
+        await authenticated_client.put(f"/v1/chores/{chore_id}", json={"current_assignee": "Alice"})
+        await authenticated_client.post(f"/v1/chores/{chore_id}/mark-due")
+        r = await authenticated_client.post(f"/v1/chores/{chore_id}/complete", json={})
         assert r.status_code == 200
         assert r.json()["current_assignee"] is None
 
         # Verify log still records who was assigned at completion time
-        log_r = await authenticated_client.get(f"/log?chore_id={chore_id}&action=completed")
+        log_r = await authenticated_client.get(f"/v1/log?chore_id={chore_id}&action=completed")
         assert log_r.status_code == 200
         logs = log_r.json()
         assert len(logs) > 0
@@ -544,17 +544,17 @@ class TestChoresAPI:
 
     @pytest.mark.asyncio
     async def test_skip_action(self, authenticated_client):
-        r = await authenticated_client.post("/chores", json=WEEKLY_CHORE)
+        r = await authenticated_client.post("/v1/chores", json=WEEKLY_CHORE)
         chore_id = r.json()["id"]
-        await authenticated_client.post(f"/chores/{chore_id}/mark-due")
+        await authenticated_client.post(f"/v1/chores/{chore_id}/mark-due")
 
-        r = await authenticated_client.post(f"/chores/{chore_id}/skip")
+        r = await authenticated_client.post(f"/v1/chores/{chore_id}/skip")
         assert r.status_code == 200
         assert r.json()["state"] == "complete"
         assert r.json()["last_change_type"] == "skipped"
 
         # Verify ChoreLog has correct person (not "system")
-        r = await authenticated_client.get(f"/log?chore_id={chore_id}&action=skipped")
+        r = await authenticated_client.get(f"/v1/log?chore_id={chore_id}&action=skipped")
         assert r.status_code == 200
         logs = r.json()
         assert len(logs) > 0
@@ -564,22 +564,22 @@ class TestChoresAPI:
 
     @pytest.mark.asyncio
     async def test_reassign_action(self, authenticated_client):
-        await authenticated_client.post("/people", json={"name": "Alice", "username": "alice"})
-        await authenticated_client.post("/people", json={"name": "Bob", "username": "bob"})
-        r = await authenticated_client.post("/chores", json=ROTATING_CHORE)
+        await authenticated_client.post("/v1/people", json={"name": "Alice", "username": "alice"})
+        await authenticated_client.post("/v1/people", json={"name": "Bob", "username": "bob"})
+        r = await authenticated_client.post("/v1/chores", json=ROTATING_CHORE)
         chore_id = r.json()["id"]
 
-        r = await authenticated_client.post(f"/chores/{chore_id}/reassign", json={"assignee": "Bob"})
+        r = await authenticated_client.post(f"/v1/chores/{chore_id}/reassign", json={"assignee": "Bob"})
         assert r.status_code == 200
         assert r.json()["current_assignee"] == "Bob"
 
     @pytest.mark.asyncio
     async def test_mark_due_action(self, authenticated_client):
-        r = await authenticated_client.post("/chores", json=WEEKLY_CHORE)
+        r = await authenticated_client.post("/v1/chores", json=WEEKLY_CHORE)
         chore_id = r.json()["id"]
-        await authenticated_client.post(f"/chores/{chore_id}/complete", json={})
+        await authenticated_client.post(f"/v1/chores/{chore_id}/complete", json={})
 
-        r = await authenticated_client.post(f"/chores/{chore_id}/mark-due")
+        r = await authenticated_client.post(f"/v1/chores/{chore_id}/mark-due")
         assert r.status_code == 200
         assert r.json()["state"] == "due"
 
@@ -587,7 +587,7 @@ class TestChoresAPI:
     async def test_mark_due_action_updates_next_due_to_today(self, authenticated_client):
         from datetime import date, timedelta
 
-        r = await authenticated_client.post("/chores", json=WEEKLY_CHORE)
+        r = await authenticated_client.post("/v1/chores", json=WEEKLY_CHORE)
         chore_id = r.json()["id"]
         original_next_due = r.json()["next_due"]
 
@@ -595,30 +595,30 @@ class TestChoresAPI:
         from datetime import datetime, timezone as tz
         utc_today = datetime.now(tz.utc).date()
         future_date = (utc_today + timedelta(days=5)).isoformat()
-        await authenticated_client.put(f"/chores/{chore_id}", json={"next_due": future_date})
+        await authenticated_client.put(f"/v1/chores/{chore_id}", json={"next_due": future_date})
 
         # Mark due should set next_due to today
-        r = await authenticated_client.post(f"/chores/{chore_id}/mark-due")
+        r = await authenticated_client.post(f"/v1/chores/{chore_id}/mark-due")
         assert r.status_code == 200
         assert r.json()["state"] == "due"
         assert r.json()["next_due"] == utc_today.isoformat()
 
     @pytest.mark.asyncio
     async def test_skip_reassign_action(self, authenticated_client):
-        await authenticated_client.post("/people", json={"name": "Alice", "username": "alice"})
-        await authenticated_client.post("/people", json={"name": "Bob", "username": "bob"})
-        r = await authenticated_client.post("/chores", json=ROTATING_CHORE)
+        await authenticated_client.post("/v1/people", json={"name": "Alice", "username": "alice"})
+        await authenticated_client.post("/v1/people", json={"name": "Bob", "username": "bob"})
+        r = await authenticated_client.post("/v1/chores", json=ROTATING_CHORE)
         chore_id = r.json()["id"]
-        await authenticated_client.post(f"/chores/{chore_id}/mark-due")
+        await authenticated_client.post(f"/v1/chores/{chore_id}/mark-due")
 
-        r = await authenticated_client.post(f"/chores/{chore_id}/skip-reassign", json={"assignee": "Bob"})
+        r = await authenticated_client.post(f"/v1/chores/{chore_id}/skip-reassign", json={"assignee": "Bob"})
         assert r.status_code == 200
         data = r.json()
         assert data["state"] == "complete"
         assert data["current_assignee"] == "Bob"
 
         # Verify ChoreLog has correct person for skip action (not "system")
-        r = await authenticated_client.get(f"/log?chore_id={chore_id}&action=skipped")
+        r = await authenticated_client.get(f"/v1/log?chore_id={chore_id}&action=skipped")
         assert r.status_code == 200
         logs = r.json()
         assert len(logs) > 0
@@ -636,7 +636,7 @@ class TestChoresAPI:
             "eligible_people": ["NonExistent"],
             "points": 5,
         }
-        r = await authenticated_client.post("/chores", json=invalid_chore)
+        r = await authenticated_client.post("/v1/chores", json=invalid_chore)
         assert r.status_code == 400
 
     @pytest.mark.asyncio
@@ -649,25 +649,25 @@ class TestChoresAPI:
             "assignee": "NonExistent",
             "points": 5,
         }
-        r = await authenticated_client.post("/chores", json=invalid_chore)
+        r = await authenticated_client.post("/v1/chores", json=invalid_chore)
         assert r.status_code == 400
 
 
 class TestPointsAPI:
     @pytest.mark.asyncio
     async def test_leaderboard_empty(self, authenticated_client):
-        r = await authenticated_client.get("/points")
+        r = await authenticated_client.get("/v1/points")
         assert r.status_code == 200
         assert r.json() == []
 
     @pytest.mark.asyncio
     async def test_leaderboard_after_completion(self, authenticated_client):
-        r = await authenticated_client.post("/chores", json=WEEKLY_CHORE)
+        r = await authenticated_client.post("/v1/chores", json=WEEKLY_CHORE)
         chore_id = r.json()["id"]
-        await authenticated_client.post(f"/chores/{chore_id}/mark-due")
-        await authenticated_client.post(f"/chores/{chore_id}/complete", json={})
+        await authenticated_client.post(f"/v1/chores/{chore_id}/mark-due")
+        await authenticated_client.post(f"/v1/chores/{chore_id}/complete", json={})
 
-        r = await authenticated_client.get("/points")
+        r = await authenticated_client.get("/v1/points")
         assert r.status_code == 200
         data = r.json()
         assert len(data) == 1
@@ -676,12 +676,12 @@ class TestPointsAPI:
 
     @pytest.mark.asyncio
     async def test_person_history(self, authenticated_client):
-        r = await authenticated_client.post("/chores", json=WEEKLY_CHORE)
+        r = await authenticated_client.post("/v1/chores", json=WEEKLY_CHORE)
         chore_id = r.json()["id"]
-        await authenticated_client.post(f"/chores/{chore_id}/mark-due")
-        await authenticated_client.post(f"/chores/{chore_id}/complete", json={})
+        await authenticated_client.post(f"/v1/chores/{chore_id}/mark-due")
+        await authenticated_client.post(f"/v1/chores/{chore_id}/complete", json={})
 
-        r = await authenticated_client.get("/points/testuser")
+        r = await authenticated_client.get("/v1/points/testuser")
         assert r.status_code == 200
         data = r.json()
         assert len(data) == 1
@@ -689,7 +689,7 @@ class TestPointsAPI:
 
     @pytest.mark.asyncio
     async def test_points_summary_empty(self, authenticated_client):
-        r = await authenticated_client.get("/points/summary")
+        r = await authenticated_client.get("/v1/points/summary")
         assert r.status_code == 200
         # testuser created by authenticated_client fixture
         summary = r.json()
@@ -701,7 +701,7 @@ class TestPointsAPI:
     @pytest.mark.asyncio
     async def test_points_summary_includes_all_people(self, seeded_client):
         ac, db = seeded_client
-        r = await ac.get("/points/summary")
+        r = await ac.get("/v1/points/summary")
         assert r.status_code == 200
         names = [e["person"] for e in r.json()]
         assert "derek" in names
@@ -713,7 +713,7 @@ class TestPointsAPI:
     async def test_points_summary_counts_recent(self, seeded_client):
         ac, db = seeded_client
         # seeded_db provides derek: 10pts 3d ago (within 7d), 20pts 15d ago (within 30d only)
-        r = await ac.get("/points/summary")
+        r = await ac.get("/v1/points/summary")
         assert r.status_code == 200
         derek = next(e for e in r.json() if e["person"] == "derek")
         assert derek["points_7d"] == 10
@@ -723,7 +723,7 @@ class TestPointsAPI:
     async def test_points_summary_zero_for_no_activity(self, seeded_client):
         ac, db = seeded_client
         # Amy has no PointsLog entries in seeded_db
-        r = await ac.get("/points/summary")
+        r = await ac.get("/v1/points/summary")
         assert r.status_code == 200
         amy = next(e for e in r.json() if e["person"] == "amy")
         assert amy["points_7d"] == 0
@@ -734,7 +734,7 @@ class TestPointsAPI:
         """user_stats should return correct non-zero points_7d and points_30d using seeded data."""
         ac, db = seeded_client
         # seeded_db provides derek: 10pts 3d ago (within 7d), 20pts 15d ago (within 30d only)
-        r = await ac.get("/points/stats/derek")
+        r = await ac.get("/v1/points/stats/derek")
         assert r.status_code == 200
         data = r.json()
         assert data["points_7d"] == 10
@@ -758,7 +758,7 @@ class TestPointsAPI:
         db.add(old_entry)
         await db.commit()
 
-        r = await authenticated_client.get("/points/stats/testuser")
+        r = await authenticated_client.get("/v1/points/stats/testuser")
         assert r.status_code == 200
         data = r.json()
         # Old entry should not appear in 7d or 30d windows
@@ -790,7 +790,7 @@ class TestPointsAPI:
         db.add_all([recent, older])
         await db.commit()
 
-        r = await authenticated_client.get("/points/stats/testuser")
+        r = await authenticated_client.get("/v1/points/stats/testuser")
         assert r.status_code == 200
         data = r.json()
         assert data["points_7d"] == 10
@@ -807,25 +807,25 @@ class TestPointsAPI:
 class TestLogAPI:
     @pytest.mark.asyncio
     async def test_log_filters_multiple_actions(self, authenticated_client):
-        await authenticated_client.post("/people", json={"name": "Alice", "username": "alice"})
-        await authenticated_client.post("/people", json={"name": "Bob", "username": "bob"})
-        r = await authenticated_client.post("/chores", json=ROTATING_CHORE)
+        await authenticated_client.post("/v1/people", json={"name": "Alice", "username": "alice"})
+        await authenticated_client.post("/v1/people", json={"name": "Bob", "username": "bob"})
+        r = await authenticated_client.post("/v1/chores", json=ROTATING_CHORE)
         chore_id = r.json()["id"]
 
-        await authenticated_client.post(f"/chores/{chore_id}/mark-due")
-        await authenticated_client.post(f"/chores/{chore_id}/complete", json={})
-        await authenticated_client.post(f"/chores/{chore_id}/reassign", json={"assignee": "Bob"})
-        await authenticated_client.put(f"/chores/{chore_id}", json={"points": 9})
+        await authenticated_client.post(f"/v1/chores/{chore_id}/mark-due")
+        await authenticated_client.post(f"/v1/chores/{chore_id}/complete", json={})
+        await authenticated_client.post(f"/v1/chores/{chore_id}/reassign", json={"assignee": "Bob"})
+        await authenticated_client.put(f"/v1/chores/{chore_id}", json={"points": 9})
 
         # After fixing reassign_chore to record the requesting user, testuser is now
         # the actor for both completed and reassigned — both show up when filtering by testuser.
-        r = await authenticated_client.get("/log?person=testuser&actions=completed&actions=reassigned")
+        r = await authenticated_client.get("/v1/log?person=testuser&actions=completed&actions=reassigned")
         assert r.status_code == 200
         actions = [entry["action"] for entry in r.json()]
         assert "completed" in actions
         assert "reassigned" in actions  # testuser is now correctly recorded (not "system")
 
-        r = await authenticated_client.get("/log?actions=completed&actions=reassigned")
+        r = await authenticated_client.get("/v1/log?actions=completed&actions=reassigned")
         assert r.status_code == 200
         actions = [entry["action"] for entry in r.json()]
         assert "completed" in actions
@@ -835,16 +835,16 @@ class TestLogAPI:
     @pytest.mark.asyncio
     async def test_complete_log_entry_has_assignee(self, authenticated_client):
         # Create people first so the rotating chore assignment is valid
-        await authenticated_client.post("/people", json={"name": "Alice", "username": "alice"})
-        await authenticated_client.post("/people", json={"name": "Bob", "username": "bob"})
+        await authenticated_client.post("/v1/people", json={"name": "Alice", "username": "alice"})
+        await authenticated_client.post("/v1/people", json={"name": "Bob", "username": "bob"})
 
-        r = await authenticated_client.post("/chores", json=ROTATING_CHORE)
+        r = await authenticated_client.post("/v1/chores", json=ROTATING_CHORE)
         chore_id = r.json()["id"]
 
-        await authenticated_client.post(f"/chores/{chore_id}/mark-due")
-        await authenticated_client.post(f"/chores/{chore_id}/complete", json={})
+        await authenticated_client.post(f"/v1/chores/{chore_id}/mark-due")
+        await authenticated_client.post(f"/v1/chores/{chore_id}/complete", json={})
 
-        r = await authenticated_client.get(f"/log?chore_id={chore_id}&action=completed")
+        r = await authenticated_client.get(f"/v1/log?chore_id={chore_id}&action=completed")
         assert r.status_code == 200
         logs = r.json()
         assert len(logs) > 0
@@ -855,13 +855,13 @@ class TestLogAPI:
 
     @pytest.mark.asyncio
     async def test_complete_log_entry_assignee_null_for_open_chore(self, authenticated_client):
-        r = await authenticated_client.post("/chores", json=WEEKLY_CHORE)
+        r = await authenticated_client.post("/v1/chores", json=WEEKLY_CHORE)
         chore_id = r.json()["id"]
 
-        await authenticated_client.post(f"/chores/{chore_id}/mark-due")
-        await authenticated_client.post(f"/chores/{chore_id}/complete", json={})
+        await authenticated_client.post(f"/v1/chores/{chore_id}/mark-due")
+        await authenticated_client.post(f"/v1/chores/{chore_id}/complete", json={})
 
-        r = await authenticated_client.get(f"/log?chore_id={chore_id}&action=completed")
+        r = await authenticated_client.get(f"/v1/log?chore_id={chore_id}&action=completed")
         assert r.status_code == 200
         logs = r.json()
         assert len(logs) > 0
@@ -872,13 +872,13 @@ class TestLogAPI:
 
     @pytest.mark.asyncio
     async def test_skip_log_entry_has_null_assignee(self, authenticated_client):
-        r = await authenticated_client.post("/chores", json=WEEKLY_CHORE)
+        r = await authenticated_client.post("/v1/chores", json=WEEKLY_CHORE)
         chore_id = r.json()["id"]
 
-        await authenticated_client.post(f"/chores/{chore_id}/mark-due")
-        await authenticated_client.post(f"/chores/{chore_id}/skip")
+        await authenticated_client.post(f"/v1/chores/{chore_id}/mark-due")
+        await authenticated_client.post(f"/v1/chores/{chore_id}/skip")
 
-        r = await authenticated_client.get(f"/log?chore_id={chore_id}&action=skipped")
+        r = await authenticated_client.get(f"/v1/log?chore_id={chore_id}&action=skipped")
         assert r.status_code == 200
         logs = r.json()
         assert len(logs) > 0
@@ -888,13 +888,13 @@ class TestLogAPI:
 
     @pytest.mark.asyncio
     async def test_reassign_log_entry_has_null_assignee(self, authenticated_client):
-        await authenticated_client.post("/people", json={"name": "Alice", "username": "alice"})
-        r = await authenticated_client.post("/chores", json=WEEKLY_CHORE)
+        await authenticated_client.post("/v1/people", json={"name": "Alice", "username": "alice"})
+        r = await authenticated_client.post("/v1/chores", json=WEEKLY_CHORE)
         chore_id = r.json()["id"]
 
-        await authenticated_client.post(f"/chores/{chore_id}/reassign", json={"assignee": "Alice"})
+        await authenticated_client.post(f"/v1/chores/{chore_id}/reassign", json={"assignee": "Alice"})
 
-        r = await authenticated_client.get(f"/log?chore_id={chore_id}&action=reassigned")
+        r = await authenticated_client.get(f"/v1/log?chore_id={chore_id}&action=reassigned")
         assert r.status_code == 200
         logs = r.json()
         assert len(logs) > 0
@@ -906,13 +906,13 @@ class TestLogAPI:
 class TestUserLogAPI:
     @pytest.mark.asyncio
     async def test_goal_change_logged_in_unified_log(self, authenticated_client):
-        r = await authenticated_client.post("/people", json={"name": "Alice", "username": "alice"})
+        r = await authenticated_client.post("/v1/people", json={"name": "Alice", "username": "alice"})
         person_id = r.json()["id"]
 
-        r = await authenticated_client.put(f"/people/{person_id}", json={"goal_7d": 30})
+        r = await authenticated_client.put(f"/v1/people/{person_id}", json={"goal_7d": 30})
         assert r.status_code == 200
 
-        r = await authenticated_client.get("/log")
+        r = await authenticated_client.get("/v1/log")
         assert r.status_code == 200
         logs = r.json()
         person_entries = [e for e in logs if e["chore_name"].startswith("Person:")]
@@ -928,12 +928,12 @@ class TestUserLogAPI:
 
     @pytest.mark.asyncio
     async def test_goal_30d_change_logged(self, authenticated_client):
-        r = await authenticated_client.post("/people", json={"name": "Bob", "username": "bob"})
+        r = await authenticated_client.post("/v1/people", json={"name": "Bob", "username": "bob"})
         person_id = r.json()["id"]
 
-        await authenticated_client.put(f"/people/{person_id}", json={"goal_30d": 100})
+        await authenticated_client.put(f"/v1/people/{person_id}", json={"goal_30d": 100})
 
-        r = await authenticated_client.get("/log")
+        r = await authenticated_client.get("/v1/log")
         logs = r.json()
         entry = next(
             (e for e in logs if e.get("field_name") == "goal_30d"),
@@ -945,13 +945,13 @@ class TestUserLogAPI:
 
     @pytest.mark.asyncio
     async def test_no_log_when_no_change(self, authenticated_client):
-        r = await authenticated_client.post("/people", json={"name": "Carol", "username": "carol"})
+        r = await authenticated_client.post("/v1/people", json={"name": "Carol", "username": "carol"})
         person_id = r.json()["id"]
 
         # Send update with same value as default (goal_7d=20 already)
-        await authenticated_client.put(f"/people/{person_id}", json={"goal_7d": 20})
+        await authenticated_client.put(f"/v1/people/{person_id}", json={"goal_7d": 20})
 
-        r = await authenticated_client.get("/log")
+        r = await authenticated_client.get("/v1/log")
         logs = r.json()
         person_goal_entries = [
             e for e in logs
@@ -960,58 +960,64 @@ class TestUserLogAPI:
         assert len(person_goal_entries) == 0
 
     @pytest.mark.asyncio
-    async def test_password_change_masked_in_log(self, authenticated_client):
-        r = await authenticated_client.post("/people", json={"name": "Dave", "username": "dave"})
+    async def test_password_change_logged_to_auth_log(self, authenticated_client):
+        """Admin password change should appear in auth_log, not user_log/chore_log."""
+        r = await authenticated_client.post("/v1/people", json={"name": "Dave", "username": "dave"})
         person_id = r.json()["id"]
 
-        await authenticated_client.put(f"/people/{person_id}", json={"password": "newpassword123"})
+        await authenticated_client.put(f"/v1/people/{person_id}", json={"password": "newpassword123"})
 
-        r = await authenticated_client.get("/log")
-        logs = r.json()
-        pw_entries = [e for e in logs if e.get("field_name") == "password"]
+        # Check auth log for password_changed event
+        r = await authenticated_client.get("/v1/auth/log")
+        auth_logs = r.json()
+        pw_entries = [e for e in auth_logs if e.get("action") == "password_changed" and e.get("username") == "dave"]
         assert len(pw_entries) >= 1
-        assert pw_entries[0]["old_value"] == "changed"
-        assert pw_entries[0]["new_value"] == "changed"
+
+        # Verify it does NOT appear in user_log (GET /log) as a field_name=password entry
+        r = await authenticated_client.get("/v1/log")
+        logs = r.json()
+        pw_field_entries = [e for e in logs if e.get("field_name") == "password"]
+        assert len(pw_field_entries) == 0
 
     @pytest.mark.asyncio
     async def test_person_log_uses_sentinel_chore_id(self, authenticated_client):
-        r = await authenticated_client.post("/people", json={"name": "Eve", "username": "eve"})
+        r = await authenticated_client.post("/v1/people", json={"name": "Eve", "username": "eve"})
         person_id = r.json()["id"]
-        await authenticated_client.put(f"/people/{person_id}", json={"goal_7d": 25})
+        await authenticated_client.put(f"/v1/people/{person_id}", json={"goal_7d": 25})
 
-        r = await authenticated_client.get("/log")
+        r = await authenticated_client.get("/v1/log")
         logs = r.json()
         person_entries = [e for e in logs if e["chore_name"].startswith("Person:")]
         assert all(e["chore_id"] == 0 for e in person_entries)
 
     @pytest.mark.asyncio
     async def test_person_log_excluded_when_real_chore_id_filtered(self, authenticated_client):
-        r = await authenticated_client.post("/people", json={"name": "Frank", "username": "frank"})
+        r = await authenticated_client.post("/v1/people", json={"name": "Frank", "username": "frank"})
         person_id = r.json()["id"]
-        await authenticated_client.put(f"/people/{person_id}", json={"goal_7d": 25})
+        await authenticated_client.put(f"/v1/people/{person_id}", json={"goal_7d": 25})
 
         # Create a chore so we have a real chore_id to filter on
-        r = await authenticated_client.post("/chores", json=WEEKLY_CHORE)
+        r = await authenticated_client.post("/v1/chores", json=WEEKLY_CHORE)
         chore_id = r.json()["id"]
 
-        r = await authenticated_client.get(f"/log?chore_id={chore_id}")
+        r = await authenticated_client.get(f"/v1/log?chore_id={chore_id}")
         logs = r.json()
         person_entries = [e for e in logs if e["chore_name"].startswith("Person:")]
         assert len(person_entries) == 0
 
     @pytest.mark.asyncio
     async def test_unified_log_sorted_by_timestamp_desc(self, authenticated_client):
-        r = await authenticated_client.post("/people", json={"name": "Grace", "username": "grace"})
+        r = await authenticated_client.post("/v1/people", json={"name": "Grace", "username": "grace"})
         person_id = r.json()["id"]
 
-        r = await authenticated_client.post("/chores", json=WEEKLY_CHORE)
+        r = await authenticated_client.post("/v1/chores", json=WEEKLY_CHORE)
         chore_id = r.json()["id"]
-        await authenticated_client.post(f"/chores/{chore_id}/mark-due")
-        await authenticated_client.post(f"/chores/{chore_id}/complete", json={})
+        await authenticated_client.post(f"/v1/chores/{chore_id}/mark-due")
+        await authenticated_client.post(f"/v1/chores/{chore_id}/complete", json={})
 
-        await authenticated_client.put(f"/people/{person_id}", json={"goal_7d": 35})
+        await authenticated_client.put(f"/v1/people/{person_id}", json={"goal_7d": 35})
 
-        r = await authenticated_client.get("/log")
+        r = await authenticated_client.get("/v1/log")
         assert r.status_code == 200
         logs = r.json()
         timestamps = [e["timestamp"] for e in logs]
@@ -1019,18 +1025,18 @@ class TestUserLogAPI:
 
     @pytest.mark.asyncio
     async def test_skip_reassign_logs_reassignment(self, authenticated_client):
-        await authenticated_client.post("/people", json={"name": "Alice", "username": "alice"})
-        await authenticated_client.post("/people", json={"name": "Bob", "username": "bob"})
-        r = await authenticated_client.post("/chores", json=ROTATING_CHORE)
+        await authenticated_client.post("/v1/people", json={"name": "Alice", "username": "alice"})
+        await authenticated_client.post("/v1/people", json={"name": "Bob", "username": "bob"})
+        r = await authenticated_client.post("/v1/chores", json=ROTATING_CHORE)
         chore_id = r.json()["id"]
-        await authenticated_client.post(f"/chores/{chore_id}/mark-due")
+        await authenticated_client.post(f"/v1/chores/{chore_id}/mark-due")
 
         r = await authenticated_client.post(
-            f"/chores/{chore_id}/skip-reassign", json={"assignee": "Bob"}
+            f"/v1/chores/{chore_id}/skip-reassign", json={"assignee": "Bob"}
         )
         assert r.status_code == 200
 
-        r = await authenticated_client.get(f"/log?chore_id={chore_id}&action=reassigned")
+        r = await authenticated_client.get(f"/v1/log?chore_id={chore_id}&action=reassigned")
         assert r.status_code == 200
         logs = r.json()
         assert len(logs) >= 1
@@ -1039,18 +1045,18 @@ class TestUserLogAPI:
 
     @pytest.mark.asyncio
     async def test_reassign_logs_requesting_user(self, authenticated_client):
-        await authenticated_client.post("/people", json={"name": "Alice", "username": "alice"})
-        await authenticated_client.post("/people", json={"name": "Bob", "username": "bob"})
-        r = await authenticated_client.post("/chores", json=ROTATING_CHORE)
+        await authenticated_client.post("/v1/people", json={"name": "Alice", "username": "alice"})
+        await authenticated_client.post("/v1/people", json={"name": "Bob", "username": "bob"})
+        r = await authenticated_client.post("/v1/chores", json=ROTATING_CHORE)
         chore_id = r.json()["id"]
-        await authenticated_client.post(f"/chores/{chore_id}/mark-due")
+        await authenticated_client.post(f"/v1/chores/{chore_id}/mark-due")
 
         r = await authenticated_client.post(
-            f"/chores/{chore_id}/reassign", json={"assignee": "Bob"}
+            f"/v1/chores/{chore_id}/reassign", json={"assignee": "Bob"}
         )
         assert r.status_code == 200
 
-        r = await authenticated_client.get(f"/log?chore_id={chore_id}&action=reassigned")
+        r = await authenticated_client.get(f"/v1/log?chore_id={chore_id}&action=reassigned")
         assert r.status_code == 200
         logs = r.json()
         assert len(logs) >= 1

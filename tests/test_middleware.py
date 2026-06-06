@@ -23,7 +23,7 @@ async def test_get_current_user_valid_token(client: AsyncClient, db: AsyncSessio
     await db.commit()
 
     # Login to get token
-    login_r = await client.post("/auth/login", json={"username": "mwtest", "password": password})
+    login_r = await client.post("/v1/auth/login", json={"username": "mwtest", "password": password})
     token = login_r.json()["access_token"]
 
     # Test protected endpoint with valid token
@@ -39,7 +39,7 @@ async def test_get_current_user_missing_token(client: AsyncClient):
     """Test that missing token returns 401."""
     health_r = await client.get("/health")
     # Note: /health endpoint is not protected, but we can use other endpoints
-    logout_r = await client.post("/auth/logout")
+    logout_r = await client.post("/v1/auth/logout")
     assert logout_r.status_code == 401
 
 
@@ -47,7 +47,7 @@ async def test_get_current_user_missing_token(client: AsyncClient):
 async def test_get_current_user_invalid_signature(client: AsyncClient):
     """Test that token with invalid signature is rejected."""
     logout_r = await client.post(
-        "/auth/logout",
+        "/v1/auth/logout",
         headers={"Authorization": "Bearer invalid.token.here"}
     )
     assert logout_r.status_code == 401
@@ -67,19 +67,19 @@ async def test_get_current_user_blacklisted_token(client: AsyncClient, db: Async
     await db.commit()
 
     # Login to get token
-    login_r = await client.post("/auth/login", json={"username": "blacklistmw", "password": password})
+    login_r = await client.post("/v1/auth/login", json={"username": "blacklistmw", "password": password})
     token = login_r.json()["access_token"]
 
     # Logout to blacklist the token
     logout_r = await client.post(
-        "/auth/logout",
+        "/v1/auth/logout",
         headers={"Authorization": f"Bearer {token}"}
     )
     assert logout_r.status_code == 204
 
     # Try to use blacklisted token
     change_r = await client.put(
-        "/auth/password",
+        "/v1/auth/password",
         json={"old_password": password, "new_password": "new_password_123"},
         headers={"Authorization": f"Bearer {token}"}
     )
@@ -91,7 +91,7 @@ async def test_require_admin_with_admin_user(client: AsyncClient, db: AsyncSessi
     """Test that admin user passes admin check."""
     # First user is auto-admin
     password = "admin_test_password"
-    login_r = await client.post("/auth/login", json={"username": "adminuser", "password": password})
+    login_r = await client.post("/v1/auth/login", json={"username": "adminuser", "password": password})
     token = login_r.json()["access_token"]
     assert login_r.json()["user"]["is_admin"] is True
 
@@ -100,7 +100,7 @@ async def test_require_admin_with_admin_user(client: AsyncClient, db: AsyncSessi
 
     # Admin user can change password (which requires being authenticated)
     change_r = await client.put(
-        "/auth/password",
+        "/v1/auth/password",
         json={"old_password": password, "new_password": "admin_new_password_123"},
         headers={"Authorization": f"Bearer {token}"}
     )
@@ -112,7 +112,7 @@ async def test_require_admin_with_normal_user(client: AsyncClient, db: AsyncSess
     """Test that normal user fails admin check."""
     # Create admin first
     admin_password = "admin_password_123"
-    admin_r = await client.post("/auth/login", json={"username": "admin", "password": admin_password})
+    admin_r = await client.post("/v1/auth/login", json={"username": "admin", "password": admin_password})
     assert admin_r.json()["user"]["is_admin"] is True
 
     # Create normal user
@@ -128,13 +128,13 @@ async def test_require_admin_with_normal_user(client: AsyncClient, db: AsyncSess
     await db.commit()
 
     # Login as normal user
-    normal_login = await client.post("/auth/login", json={"username": "normaluser", "password": normal_password})
+    normal_login = await client.post("/v1/auth/login", json={"username": "normaluser", "password": normal_password})
     token = normal_login.json()["access_token"]
     assert normal_login.json()["user"]["is_admin"] is False
 
     # Normal user can still change their password (authenticated)
     change_r = await client.put(
-        "/auth/password",
+        "/v1/auth/password",
         json={"old_password": normal_password, "new_password": "normal_new_password_123"},
         headers={"Authorization": f"Bearer {token}"}
     )

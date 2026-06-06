@@ -51,6 +51,7 @@ services:
     command: python seed.py --base-url http://old-backend:8000
     environment:
       DATABASE_URL: postgresql+asyncpg://chores:chores@db/chores
+      JWT_SECRET: upgrade-test-secret
     depends_on:
       old-backend:
         condition: service_healthy
@@ -62,6 +63,7 @@ services:
       dockerfile: Dockerfile
     environment:
       DATABASE_URL: postgresql+asyncpg://chores:chores@db/chores
+      JWT_SECRET: upgrade-test-secret
     depends_on:
       seed:
         condition: service_completed_successfully
@@ -80,6 +82,7 @@ services:
     command: python validate_upgrade.py --base-url http://new-backend:8000
     environment:
       DATABASE_URL: postgresql+asyncpg://chores:chores@db/chores
+      JWT_SECRET: upgrade-test-secret
     depends_on:
       new-backend:
         condition: service_healthy

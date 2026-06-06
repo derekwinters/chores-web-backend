@@ -114,7 +114,10 @@ class TestImportConfig:
         person = await db.get(Person, 1)
         assert person is not None
         assert person.name == "Test User"
-        assert person.password_hash == "password"
+        # password_hash should be a bcrypt hash of the default import password
+        from app.security import verify_password
+        from app.services.import_service import DEFAULT_IMPORT_PASSWORD
+        assert verify_password(DEFAULT_IMPORT_PASSWORD, person.password_hash)
 
     async def test_import_creates_chores(self, db: AsyncSession):
         from app.services.export_service import compute_schema_version

@@ -24,7 +24,7 @@ async def test_login_with_valid_credentials(client: AsyncClient, db: AsyncSessio
     await db.commit()
 
     # Login with correct credentials
-    r = await client.post("/auth/login", json={"username": "testuser", "password": password})
+    r = await client.post("/v1/auth/login", json={"username": "testuser", "password": password})
     assert r.status_code == 200
     data = r.json()
     assert "access_token" in data
@@ -47,7 +47,7 @@ async def test_login_admin_flag(client: AsyncClient, db: AsyncSession):
     db.add(admin_user)
     await db.commit()
 
-    r = await client.post("/auth/login", json={"username": "admin", "password": password})
+    r = await client.post("/v1/auth/login", json={"username": "admin", "password": password})
     assert r.status_code == 200
     data = r.json()
     assert data["user"]["is_admin"] is True
@@ -68,7 +68,7 @@ async def test_login_invalid_username(client: AsyncClient, db: AsyncSession):
     await db.commit()
 
     # Try to login with non-existent username
-    r = await client.post("/auth/login", json={"username": "nonexistent", "password": "password123"})
+    r = await client.post("/v1/auth/login", json={"username": "nonexistent", "password": "password123"})
     assert r.status_code == 401
     assert "detail" in r.json()
 
@@ -86,7 +86,7 @@ async def test_login_invalid_password(client: AsyncClient, db: AsyncSession):
     db.add(person)
     await db.commit()
 
-    r = await client.post("/auth/login", json={"username": "testuser2", "password": "wrong_password"})
+    r = await client.post("/v1/auth/login", json={"username": "testuser2", "password": "wrong_password"})
     assert r.status_code == 401
 
 
@@ -103,7 +103,7 @@ async def test_login_token_format(client: AsyncClient, db: AsyncSession):
     db.add(person)
     await db.commit()
 
-    r = await client.post("/auth/login", json={"username": "tokentest", "password": password})
+    r = await client.post("/v1/auth/login", json={"username": "tokentest", "password": password})
     data = r.json()
     token = data["access_token"]
 
@@ -117,7 +117,7 @@ async def test_first_user_auto_admin(client: AsyncClient):
     """Test that first user in empty system becomes admin."""
     # Assuming database is empty (from test setup)
     password = "first_user_password"
-    r = await client.post("/auth/login", json={"username": "firstuser", "password": password})
+    r = await client.post("/v1/auth/login", json={"username": "firstuser", "password": password})
 
     # First login auto-creates user as admin
     assert r.status_code == 200
@@ -133,7 +133,7 @@ async def test_second_user_not_admin(client: AsyncClient, db: AsyncSession):
     password2 = "second_password"
 
     # Create first user via login (will be admin)
-    r1 = await client.post("/auth/login", json={"username": "user1", "password": password1})
+    r1 = await client.post("/v1/auth/login", json={"username": "user1", "password": password1})
     assert r1.status_code == 200
     assert r1.json()["user"]["is_admin"] is True
 
@@ -148,6 +148,6 @@ async def test_second_user_not_admin(client: AsyncClient, db: AsyncSession):
     await db.commit()
 
     # Login as second user (should not be admin)
-    r2 = await client.post("/auth/login", json={"username": "user2", "password": password2})
+    r2 = await client.post("/v1/auth/login", json={"username": "user2", "password": password2})
     assert r2.status_code == 200
     assert r2.json()["user"]["is_admin"] is False

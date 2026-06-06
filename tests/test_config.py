@@ -10,7 +10,7 @@ from app.models import Settings
 @pytest.mark.asyncio
 async def test_get_config_default_values(authenticated_client: AsyncClient):
     """Test that config returns default values when no settings are stored."""
-    r = await authenticated_client.get("/config")
+    r = await authenticated_client.get("/v1/config")
     assert r.status_code == 200
     data = r.json()
     assert data["title"] == "Family Chores"
@@ -59,7 +59,7 @@ async def test_get_config_custom_values(authenticated_client: AsyncClient, db: A
 
     await db.commit()
 
-    r = await authenticated_client.get("/config")
+    r = await authenticated_client.get("/v1/config")
     assert r.status_code == 200
     data = r.json()
     assert data["title"] == "My Chores"
@@ -71,13 +71,13 @@ async def test_get_config_custom_values(authenticated_client: AsyncClient, db: A
 @pytest.mark.asyncio
 async def test_update_config_title(authenticated_client: AsyncClient):
     """Test updating the title."""
-    r = await authenticated_client.put("/config", json={"title": "Updated Title"})
+    r = await authenticated_client.put("/v1/config", json={"title": "Updated Title"})
     assert r.status_code == 200
     data = r.json()
     assert data["title"] == "Updated Title"
 
     # Verify persistence
-    r = await authenticated_client.get("/config")
+    r = await authenticated_client.get("/v1/config")
     assert r.status_code == 200
     assert r.json()["title"] == "Updated Title"
 
@@ -85,13 +85,13 @@ async def test_update_config_title(authenticated_client: AsyncClient):
 @pytest.mark.asyncio
 async def test_update_config_auth_enabled(authenticated_client: AsyncClient):
     """Test updating auth_enabled."""
-    r = await authenticated_client.put("/config", json={"auth_enabled": False})
+    r = await authenticated_client.put("/v1/config", json={"auth_enabled": False})
     assert r.status_code == 200
     data = r.json()
     assert data["auth_enabled"] is False
 
     # Verify persistence
-    r = await authenticated_client.get("/config")
+    r = await authenticated_client.get("/v1/config")
     assert r.status_code == 200
     assert r.json()["auth_enabled"] is False
 
@@ -99,13 +99,13 @@ async def test_update_config_auth_enabled(authenticated_client: AsyncClient):
 @pytest.mark.asyncio
 async def test_update_config_timezone(authenticated_client: AsyncClient):
     """Test updating timezone."""
-    r = await authenticated_client.put("/config", json={"timezone": "Europe/London"})
+    r = await authenticated_client.put("/v1/config", json={"timezone": "Europe/London"})
     assert r.status_code == 200
     data = r.json()
     assert data["timezone"] == "Europe/London"
 
     # Verify persistence
-    r = await authenticated_client.get("/config")
+    r = await authenticated_client.get("/v1/config")
     assert r.status_code == 200
     assert r.json()["timezone"] == "Europe/London"
 
@@ -113,13 +113,13 @@ async def test_update_config_timezone(authenticated_client: AsyncClient):
 @pytest.mark.asyncio
 async def test_update_config_due_soon_days(authenticated_client: AsyncClient):
     """Test updating due_soon_days."""
-    r = await authenticated_client.put("/config", json={"due_soon_days": 7})
+    r = await authenticated_client.put("/v1/config", json={"due_soon_days": 7})
     assert r.status_code == 200
     data = r.json()
     assert data["due_soon_days"] == 7
 
     # Verify persistence
-    r = await authenticated_client.get("/config")
+    r = await authenticated_client.get("/v1/config")
     assert r.status_code == 200
     assert r.json()["due_soon_days"] == 7
 
@@ -127,21 +127,21 @@ async def test_update_config_due_soon_days(authenticated_client: AsyncClient):
 @pytest.mark.asyncio
 async def test_update_config_due_soon_days_invalid_low(authenticated_client: AsyncClient):
     """Test that due_soon_days below 1 is rejected."""
-    r = await authenticated_client.put("/config", json={"due_soon_days": 0})
+    r = await authenticated_client.put("/v1/config", json={"due_soon_days": 0})
     assert r.status_code == 422  # Validation error
 
 
 @pytest.mark.asyncio
 async def test_update_config_due_soon_days_invalid_high(authenticated_client: AsyncClient):
     """Test that due_soon_days above 365 is rejected."""
-    r = await authenticated_client.put("/config", json={"due_soon_days": 366})
+    r = await authenticated_client.put("/v1/config", json={"due_soon_days": 366})
     assert r.status_code == 422  # Validation error
 
 
 @pytest.mark.asyncio
 async def test_update_config_due_soon_days_boundary_low(authenticated_client: AsyncClient):
     """Test that due_soon_days of 1 is accepted."""
-    r = await authenticated_client.put("/config", json={"due_soon_days": 1})
+    r = await authenticated_client.put("/v1/config", json={"due_soon_days": 1})
     assert r.status_code == 200
     data = r.json()
     assert data["due_soon_days"] == 1
@@ -150,7 +150,7 @@ async def test_update_config_due_soon_days_boundary_low(authenticated_client: As
 @pytest.mark.asyncio
 async def test_update_config_due_soon_days_boundary_high(authenticated_client: AsyncClient):
     """Test that due_soon_days of 365 is accepted."""
-    r = await authenticated_client.put("/config", json={"due_soon_days": 365})
+    r = await authenticated_client.put("/v1/config", json={"due_soon_days": 365})
     assert r.status_code == 200
     data = r.json()
     assert data["due_soon_days"] == 365
@@ -159,7 +159,7 @@ async def test_update_config_due_soon_days_boundary_high(authenticated_client: A
 @pytest.mark.asyncio
 async def test_update_config_auth_enabled_stores_lowercase(authenticated_client: AsyncClient, db: AsyncSession):
     """Test that PUT /config with auth_enabled=false stores lowercase 'false' in the DB, not Python 'False'."""
-    r = await authenticated_client.put("/config", json={"auth_enabled": False})
+    r = await authenticated_client.put("/v1/config", json={"auth_enabled": False})
     assert r.status_code == 200
     assert r.json()["auth_enabled"] is False
 
@@ -172,7 +172,7 @@ async def test_update_config_auth_enabled_stores_lowercase(authenticated_client:
 @pytest.mark.asyncio
 async def test_update_config_update_check_enabled_stores_lowercase(authenticated_client: AsyncClient, db: AsyncSession):
     """Test that PUT /config with update_check_enabled=false stores lowercase 'false' in the DB."""
-    r = await authenticated_client.put("/config", json={"update_check_enabled": False})
+    r = await authenticated_client.put("/v1/config", json={"update_check_enabled": False})
     assert r.status_code == 200
     assert r.json()["update_check_enabled"] is False
 
@@ -185,7 +185,7 @@ async def test_update_config_update_check_enabled_stores_lowercase(authenticated
 @pytest.mark.asyncio
 async def test_update_config_multiple_fields(authenticated_client: AsyncClient):
     """Test updating multiple config fields at once."""
-    r = await authenticated_client.put("/config", json={
+    r = await authenticated_client.put("/v1/config", json={
         "title": "New Title",
         "timezone": "Asia/Tokyo",
         "due_soon_days": 10
@@ -197,7 +197,7 @@ async def test_update_config_multiple_fields(authenticated_client: AsyncClient):
     assert data["due_soon_days"] == 10
 
     # Verify persistence
-    r = await authenticated_client.get("/config")
+    r = await authenticated_client.get("/v1/config")
     assert r.status_code == 200
     data = r.json()
     assert data["title"] == "New Title"
@@ -210,7 +210,7 @@ async def test_update_config_multiple_fields(authenticated_client: AsyncClient):
 @pytest.mark.asyncio
 async def test_get_config_default_due_time_hour(authenticated_client: AsyncClient):
     """GET /config returns due_time_hour defaulting to 6."""
-    r = await authenticated_client.get("/config")
+    r = await authenticated_client.get("/v1/config")
     assert r.status_code == 200
     assert r.json()["due_time_hour"] == 6
 
@@ -221,7 +221,7 @@ async def test_get_config_custom_due_time_hour(authenticated_client: AsyncClient
     db.add(Settings(key="due_time_hour", value="14"))
     await db.commit()
 
-    r = await authenticated_client.get("/config")
+    r = await authenticated_client.get("/v1/config")
     assert r.status_code == 200
     assert r.json()["due_time_hour"] == 14
 
@@ -229,12 +229,12 @@ async def test_get_config_custom_due_time_hour(authenticated_client: AsyncClient
 @pytest.mark.asyncio
 async def test_update_config_due_time_hour(authenticated_client: AsyncClient):
     """PUT /config saves due_time_hour and returns it."""
-    r = await authenticated_client.put("/config", json={"due_time_hour": 8})
+    r = await authenticated_client.put("/v1/config", json={"due_time_hour": 8})
     assert r.status_code == 200
     assert r.json()["due_time_hour"] == 8
 
     # Verify persistence
-    r = await authenticated_client.get("/config")
+    r = await authenticated_client.get("/v1/config")
     assert r.status_code == 200
     assert r.json()["due_time_hour"] == 8
 
@@ -242,7 +242,7 @@ async def test_update_config_due_time_hour(authenticated_client: AsyncClient):
 @pytest.mark.asyncio
 async def test_update_config_due_time_hour_boundary_low(authenticated_client: AsyncClient):
     """PUT /config accepts due_time_hour=0 (midnight)."""
-    r = await authenticated_client.put("/config", json={"due_time_hour": 0})
+    r = await authenticated_client.put("/v1/config", json={"due_time_hour": 0})
     assert r.status_code == 200
     assert r.json()["due_time_hour"] == 0
 
@@ -250,7 +250,7 @@ async def test_update_config_due_time_hour_boundary_low(authenticated_client: As
 @pytest.mark.asyncio
 async def test_update_config_due_time_hour_boundary_high(authenticated_client: AsyncClient):
     """PUT /config accepts due_time_hour=23 (11 PM)."""
-    r = await authenticated_client.put("/config", json={"due_time_hour": 23})
+    r = await authenticated_client.put("/v1/config", json={"due_time_hour": 23})
     assert r.status_code == 200
     assert r.json()["due_time_hour"] == 23
 
@@ -258,14 +258,14 @@ async def test_update_config_due_time_hour_boundary_high(authenticated_client: A
 @pytest.mark.asyncio
 async def test_update_config_due_time_hour_invalid_low(authenticated_client: AsyncClient):
     """PUT /config rejects due_time_hour below 0."""
-    r = await authenticated_client.put("/config", json={"due_time_hour": -1})
+    r = await authenticated_client.put("/v1/config", json={"due_time_hour": -1})
     assert r.status_code == 422
 
 
 @pytest.mark.asyncio
 async def test_update_config_due_time_hour_invalid_high(authenticated_client: AsyncClient):
     """PUT /config rejects due_time_hour above 23."""
-    r = await authenticated_client.put("/config", json={"due_time_hour": 24})
+    r = await authenticated_client.put("/v1/config", json={"due_time_hour": 24})
     assert r.status_code == 422
 
 
@@ -274,7 +274,7 @@ async def test_update_config_due_time_hour_reschedules_transition(authenticated_
     """PUT /config with due_time_hour reschedules the transition job."""
     from unittest.mock import patch
     with patch("app.routers.config.reschedule_transition") as mock_reschedule:
-        r = await authenticated_client.put("/config", json={"due_time_hour": 7})
+        r = await authenticated_client.put("/v1/config", json={"due_time_hour": 7})
         assert r.status_code == 200
         mock_reschedule.assert_called_once_with(7, "UTC")
 
@@ -284,7 +284,7 @@ async def test_update_config_timezone_reschedules_transition(authenticated_clien
     """PUT /config with timezone reschedules the transition job."""
     from unittest.mock import patch
     with patch("app.routers.config.reschedule_transition") as mock_reschedule:
-        r = await authenticated_client.put("/config", json={"timezone": "America/Chicago"})
+        r = await authenticated_client.put("/v1/config", json={"timezone": "America/Chicago"})
         assert r.status_code == 200
         mock_reschedule.assert_called_once_with(6, "America/Chicago")
 
@@ -294,6 +294,6 @@ async def test_update_config_title_does_not_reschedule(authenticated_client: Asy
     """PUT /config with only title does NOT reschedule the transition job."""
     from unittest.mock import patch
     with patch("app.routers.config.reschedule_transition") as mock_reschedule:
-        r = await authenticated_client.put("/config", json={"title": "New Title"})
+        r = await authenticated_client.put("/v1/config", json={"title": "New Title"})
         assert r.status_code == 200
         mock_reschedule.assert_not_called()

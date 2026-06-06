@@ -24,12 +24,12 @@ async def test_logout_invalidates_token(client: AsyncClient, db: AsyncSession):
     await db.commit()
 
     # Login to get token
-    login_r = await client.post("/auth/login", json={"username": "logouttest", "password": password})
+    login_r = await client.post("/v1/auth/login", json={"username": "logouttest", "password": password})
     token = login_r.json()["access_token"]
 
     # Logout
     logout_r = await client.post(
-        "/auth/logout",
+        "/v1/auth/logout",
         headers={"Authorization": f"Bearer {token}"}
     )
     assert logout_r.status_code == 204
@@ -38,7 +38,7 @@ async def test_logout_invalidates_token(client: AsyncClient, db: AsyncSession):
 @pytest.mark.asyncio
 async def test_logout_without_token(client: AsyncClient):
     """Test logout without authorization header."""
-    logout_r = await client.post("/auth/logout")
+    logout_r = await client.post("/v1/auth/logout")
     assert logout_r.status_code == 401
 
 
@@ -46,7 +46,7 @@ async def test_logout_without_token(client: AsyncClient):
 async def test_logout_with_invalid_token(client: AsyncClient):
     """Test logout with invalid token."""
     logout_r = await client.post(
-        "/auth/logout",
+        "/v1/auth/logout",
         headers={"Authorization": "Bearer invalid.token.here"}
     )
     assert logout_r.status_code == 401
@@ -67,7 +67,7 @@ async def test_token_added_to_blacklist(client: AsyncClient, db: AsyncSession):
     await db.commit()
 
     # Login
-    login_r = await client.post("/auth/login", json={"username": "blacklisttest", "password": password})
+    login_r = await client.post("/v1/auth/login", json={"username": "blacklisttest", "password": password})
     token = login_r.json()["access_token"]
 
     # Verify token is not in blacklist yet
@@ -76,7 +76,7 @@ async def test_token_added_to_blacklist(client: AsyncClient, db: AsyncSession):
 
     # Logout
     logout_r = await client.post(
-        "/auth/logout",
+        "/v1/auth/logout",
         headers={"Authorization": f"Bearer {token}"}
     )
     assert logout_r.status_code == 204

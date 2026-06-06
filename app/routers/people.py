@@ -11,7 +11,7 @@ from ..models import Person, RedemptionLog
 from ..schemas import PersonCreate, PersonOut, PersonUpdate, PersonRedemption, RedemptionLogOut
 from ..dependencies import get_current_user, require_admin
 from ..security import hash_password
-from ..services.logging import log_person_change
+from ..services.logging import log_person_change, log_auth_event
 
 logger = logging.getLogger(__name__)
 
@@ -39,9 +39,11 @@ async def create_person(body: PersonCreate, current_user: str = Depends(require_
         username=body.username,
         password_hash=hash_password(body.password or ""),
         is_admin=False,
+        requires_password_reset=False,
         color=body.color or "#3B82F6"  # TODO: Remove color field in next major version
     )
     db.add(person)
+    await log_auth_event(body.username, "user_created", db, changed_by=current_user)
     try:
         await db.commit()
         await db.refresh(person)
@@ -91,18 +93,12 @@ async def update_person(person_id: int, body: PersonUpdate, current_user: str = 
             setattr(person, field, value)
 
     if body.password:
-        old_pw = person.password_hash
         person.password_hash = hash_password(body.password)
-        await log_person_change(
-            person_id=person.id,
-            person_name=person.name,
-            action="updated",
-            changed_by=current_user,
-            db=db,
-            field_name="password",
-            old_value=old_pw,
-            new_value="set",
-        )
+        # When admin changes another user's password, require them to reset it on next login
+        if current_user != person.username:
+            person.requires_password_reset = True
+        # Log to auth_log (auth event) instead of user_log
+        await log_auth_event(person.username, "password_changed", db, changed_by=current_user)
 
     # Log each changed loggable field
     for field in loggable_fields:

@@ -298,11 +298,11 @@ class TestRouterCreateChoreErrorHandling:
             "eligible_people": [],
             "points": 0,
         }
-        r = await authenticated_client.post("/chores", json=create_body)
+        r = await authenticated_client.post("/v1/chores", json=create_body)
         assert r.status_code == 201
 
         # Second identical request should 409
-        r2 = await authenticated_client.post("/chores", json=create_body)
+        r2 = await authenticated_client.post("/v1/chores", json=create_body)
         assert r2.status_code == 409
 
     @pytest.mark.asyncio

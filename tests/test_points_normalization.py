@@ -55,7 +55,7 @@ async def _make_points_log(db: AsyncSession, person_name: str, points: int) -> P
 
 
 async def _token(client: AsyncClient, username: str = "admin", password: str = "adminpass") -> str:
-    r = await client.post("/auth/login", json={"username": username, "password": password})
+    r = await client.post("/v1/auth/login", json={"username": username, "password": password})
     return r.json()["access_token"]
 
 
@@ -126,7 +126,7 @@ class TestStatsEndpointByUsername:
         await _make_points_log(db, person_name="derek", points=3)
 
         token = await _token(client)
-        r = await client.get("/points/stats/derek", headers={"Authorization": f"Bearer {token}"})
+        r = await client.get("/v1/points/stats/derek", headers={"Authorization": f"Bearer {token}"})
 
         assert r.status_code == 200
         data = r.json()

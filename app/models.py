@@ -16,6 +16,7 @@ class Person(Base):
     name: Mapped[str] = mapped_column(Text, nullable=False)
     username: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    requires_password_reset: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     is_admin: Mapped[bool] = mapped_column(Integer, nullable=False, default=False)
     color: Mapped[str] = mapped_column(Text, nullable=False, default="#004272")
     goal_7d: Mapped[int] = mapped_column(Integer, nullable=False, default=20)
@@ -111,6 +112,16 @@ class UserLog(Base):
     new_value: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     changed_by: Mapped[str] = mapped_column(Text, nullable=False)
     timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class AuthLog(Base):
+    __tablename__ = "auth_log"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    username: Mapped[str] = mapped_column(Text, nullable=False)
+    action: Mapped[str] = mapped_column(Text, nullable=False)
+    changed_by: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
 
 
 class Settings(Base):
