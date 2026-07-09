@@ -4,6 +4,12 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 14
+    groups:
+      github-actions:
+        patterns:
+          - "*"
     commit-message:
       prefix: build
       include: scope
@@ -11,6 +17,12 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 14
+    groups:
+      python-dependencies:
+        patterns:
+          - "*"
     commit-message:
       prefix: build
       include: scope
