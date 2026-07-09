@@ -2,17 +2,16 @@
 """Generate the OpenAPI JSON snapshot for the chores-web API.
 
 Usage:
-    cd backend
-    python ../scripts/generate_openapi.py [--output ../docs/api/openapi.json]
+    python scripts/generate_openapi.py [--output openapi.json]
 
-The output file is committed to the repo as the golden snapshot.
-The CI job runs this script and uses oasdiff to detect breaking changes
-against the committed snapshot.
+The golden snapshot is committed in the chores-web-docs repo at
+docs/api/openapi.json (contract-first). CI runs this script and uses
+oasdiff to detect breaking changes against that published contract.
 
 Breaking Change Ritual (also documented in CLAUDE.md):
-1. Increment the API_VERSION file at repo root.
-2. Mount new routes under /api/v{N}/ alongside old ones.
-3. Re-run this script to update docs/api/openapi.json.
+1. PR to chores-web-docs: increment API_VERSION and update the golden
+   docs/api/openapi.json there.
+2. Mount new routes under /api/v{N}/ alongside old ones in this repo.
 """
 import argparse
 import json
@@ -21,7 +20,7 @@ import sys
 
 # Add the backend directory to sys.path so we can import the app
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-BACKEND_DIR = os.path.join(SCRIPT_DIR, "..", "backend")
+BACKEND_DIR = os.path.join(SCRIPT_DIR, "..")
 sys.path.insert(0, BACKEND_DIR)
 
 # Set a dummy JWT_SECRET so Settings() doesn't fail (no .env in CI)
@@ -44,7 +43,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate OpenAPI snapshot")
     parser.add_argument(
         "--output",
-        default=os.path.join(SCRIPT_DIR, "..", "docs", "api", "openapi.json"),
+        default=os.path.join(SCRIPT_DIR, "..", "openapi.json"),
         help="Output path for the OpenAPI JSON snapshot",
     )
     args = parser.parse_args()

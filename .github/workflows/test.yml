@@ -1,0 +1,135 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.11', '3.12']
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: derekwinters/chores-web-actions/actions/setup-python@19729c4d6ee3366dc32f4bd8946cb8ac7f6b05e5
+        with:
+          python-version: ${{ matrix.python-version }}
+          requirements-path: requirements.txt
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio pytest-cov httpx
+      - name: Run tests
+        run: pytest --cov=app --cov-report=xml
+        env:
+          JWT_SECRET: ci-test-secret
+      - name: Upload coverage
+        uses: codecov/codecov-action@0f8570b1a125f4937846a11fcfa3bcd548bd8c97 # v4.6.0
+        if: matrix.python-version == '3.12'
+        with:
+          files: ./coverage.xml
+          flags: backend
+          fail_ci_if_error: false
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: derekwinters/chores-web-actions/actions/setup-python@19729c4d6ee3366dc32f4bd8946cb8ac7f6b05e5
+        with:
+          requirements-path: requirements.txt
+      - name: Install linting tools
+        run: pip install black flake8 isort
+      - name: Check Python formatting
+        run: |
+          black --check app/ || true
+          flake8 app/ || true
+          isort --check-only app/ || true
+
+  api-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - name: Check out API contract (chores-web-docs)
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          repository: derekwinters/chores-web-docs
+          path: contract
+          token: ${{ secrets.DOCS_READ_TOKEN || github.token }}
+      - uses: derekwinters/chores-web-actions/actions/setup-python@19729c4d6ee3366dc32f4bd8946cb8ac7f6b05e5
+        with:
+          requirements-path: requirements.txt
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Generate current OpenAPI snapshot
+        run: python scripts/generate_openapi.py --output /tmp/openapi-current.json
+        env:
+          JWT_SECRET: ci-check-only
+      - name: Install oasdiff
+        run: |
+          OASDIFF_VERSION=$(curl -s https://api.github.com/repos/oasdiff/oasdiff/releases/latest | grep '"tag_name"' | cut -d'"' -f4)
+          OASDIFF_VERSION_TRIMMED=${OASDIFF_VERSION#v}
+          curl -sSfL "https://github.com/oasdiff/oasdiff/releases/download/${OASDIFF_VERSION}/oasdiff_${OASDIFF_VERSION_TRIMMED}_linux_amd64.tar.gz" -o /tmp/oasdiff.tar.gz
+          tar -xzf /tmp/oasdiff.tar.gz -C /usr/local/bin oasdiff
+          chmod +x /usr/local/bin/oasdiff
+      - name: Check for breaking changes against the published contract
+        run: |
+          API_VERSION=$(tr -d '[:space:]' < contract/API_VERSION)
+          oasdiff breaking contract/docs/api/openapi.json /tmp/openapi-current.json --fail-on ERR
+          echo "API contract check passed (contract version: $API_VERSION)"
+
+  docker-build:
+    needs: [tests]
+    uses: derekwinters/chores-web-actions/.github/workflows/docker-build-push.yml@19729c4d6ee3366dc32f4bd8946cb8ac7f6b05e5
+    with:
+      context: .
+      image-name: chores-web-backend
+      push: false
+
+  upgrade-regression:
+    runs-on: ubuntu-latest
+    needs: [tests]
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - name: Log in to GHCR
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Resolve latest published GHCR tag
+        id: prev-tag
+        run: |
+          PREV_TAG=$(gh release list --limit 1 --json tagName -q '.[0].tagName' | sed 's/^v//')
+          if [ -z "$PREV_TAG" ]; then
+            echo "No previous release found; skipping upgrade regression test" >&2
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Previous release tag: $PREV_TAG"
+            echo "prev_tag=$PREV_TAG" >> "$GITHUB_OUTPUT"
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Run upgrade regression test
+        if: steps.prev-tag.outputs.skip == 'false'
+        env:
+          PREV_TAG: ${{ steps.prev-tag.outputs.prev_tag }}
+        run: |
+          docker compose -f docker-compose.test-upgrade.yml up --build -d
+          docker compose -f docker-compose.test-upgrade.yml wait validate
+      - name: Collect validate service logs on failure
+        if: failure()
+        run: |
+          docker compose -f docker-compose.test-upgrade.yml logs new-backend validate || true
+      - name: Tear down upgrade test containers
+        if: always()
+        run: |
+          docker compose -f docker-compose.test-upgrade.yml down --volumes --remove-orphans || true

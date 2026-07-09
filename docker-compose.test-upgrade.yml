@@ -31,7 +31,7 @@ services:
       retries: 10
 
   old-backend:
-    image: ghcr.io/derekwinters/chores-web/backend:${PREV_TAG}
+    image: ghcr.io/derekwinters/chores-web-backend:${PREV_TAG}
     environment:
       DATABASE_URL: postgresql+asyncpg://chores:chores@db/chores
     depends_on:
@@ -46,7 +46,7 @@ services:
 
   seed:
     build:
-      context: ./backend
+      context: .
       dockerfile: Dockerfile
     command: python seed.py --base-url http://old-backend:8000
     environment:
@@ -59,7 +59,7 @@ services:
 
   new-backend:
     build:
-      context: ./backend
+      context: .
       dockerfile: Dockerfile
     environment:
       DATABASE_URL: postgresql+asyncpg://chores:chores@db/chores
@@ -77,7 +77,7 @@ services:
 
   validate:
     build:
-      context: ./backend
+      context: .
       dockerfile: Dockerfile
     command: python validate_upgrade.py --base-url http://new-backend:8000
     environment:

@@ -1,0 +1,25 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+  packages: write
+
+jobs:
+  release-please:
+    uses: derekwinters/chores-web-actions/.github/workflows/release-please.yml@19729c4d6ee3366dc32f4bd8946cb8ac7f6b05e5
+
+  publish-image:
+    needs: release-please
+    if: needs.release-please.outputs.release_created
+    uses: derekwinters/chores-web-actions/.github/workflows/docker-build-push.yml@19729c4d6ee3366dc32f4bd8946cb8ac7f6b05e5
+    with:
+      context: .
+      image-name: chores-web-backend
+      push: true
+      version: ${{ needs.release-please.outputs.version }}
