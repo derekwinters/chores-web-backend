@@ -1,3 +1,6 @@
+import json
+from pathlib import Path
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,99 +12,26 @@ from ..dependencies import get_current_user, require_admin
 
 router = APIRouter(prefix="/theme", tags=["theme"])
 
-# Default themes
-DEFAULT_THEMES = {
-    "dark": ThemeOut(
-        id="dark",
-        name="Dark",
-        colors=ThemeColors(
-            bg="#080c14",
-            surface="#16202e",
-            surface2="#1e2d40",
-            accent="#73B1DD",
-            primary="#3574B3",
-            secondary="#4a5568",
-            success="#3db87a",
-            warning="#e8a930",
-            error="#e05c6a",
-        ),
-    ),
-    "light": ThemeOut(
-        id="light",
-        name="Light",
-        colors=ThemeColors(
-            bg="#f5f5f5",
-            surface="#ffffff",
-            surface2="#eeeeee",
-            accent="#0066cc",
-            primary="#0066cc",
-            secondary="#6c757d",
-            success="#00aa00",
-            warning="#ff9900",
-            error="#cc0000",
-        ),
-    ),
-    "charcoal": ThemeOut(
-        id="charcoal",
-        name="Charcoal",
-        colors=ThemeColors(
-            bg="#1a1a1a",
-            surface="#2d2d2d",
-            surface2="#3a3a3a",
-            accent="#999999",
-            primary="#666666",
-            secondary="#555555",
-            success="#999999",
-            warning="#999999",
-            error="#999999",
-        ),
-    ),
-    "paper": ThemeOut(
-        id="paper",
-        name="Paper",
-        colors=ThemeColors(
-            bg="#f0ede6",
-            surface="#faf8f3",
-            surface2="#f5f0e9",
-            accent="#b8860b",
-            primary="#8b6914",
-            secondary="#7a7a6a",
-            success="#558b2f",
-            warning="#e0860b",
-            error="#d32f2f",
-        ),
-    ),
-    "pink": ThemeOut(
-        id="pink",
-        name="Pink",
-        colors=ThemeColors(
-            bg="#ffffff",
-            surface="#fff0f5",
-            surface2="#ffe0ea",
-            accent="#ec407a",
-            primary="#e91e8c",
-            secondary="#c48b9f",
-            success="#66bb6a",
-            warning="#ffa726",
-            error="#ef5350",
-        ),
-    ),
-    "frog": ThemeOut(
-        id="frog",
-        name="Frog",
-        colors=ThemeColors(
-            bg="#1b4d2e",
-            surface="#2d6a3e",
-            surface2="#3d8b52",
-            accent="#c8e6c9",
-            primary="#5a9e6f",
-            secondary="#4a7a5e",
-            success="#9ccc65",
-            warning="#ffa726",
-            error="#ef5350",
-        ),
-    ),
-}
+# Built-in palettes are design data owned by chores-web-design-tokens and
+# vendored at app/data/themes.json (refresh: scripts/update_themes.py).
+# Keys starting with "_" are metadata (e.g. the pinned token version).
+_THEMES_FILE = Path(__file__).resolve().parent.parent / "data" / "themes.json"
+
+
+def _load_default_themes() -> dict[str, ThemeOut]:
+    raw = json.loads(_THEMES_FILE.read_text())
+    return {
+        theme_id: ThemeOut(
+            id=theme_id,
+            name=theme_id.capitalize(),
+            colors=ThemeColors(**slots),
+        )
+        for theme_id, slots in raw.items()
+        if not theme_id.startswith("_")
+    }
+
+
+DEFAULT_THEMES = _load_default_themes()
 
 # Custom themes (in-memory, would be database in production)
 _custom_themes: dict = {}
