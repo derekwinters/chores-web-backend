@@ -34,6 +34,7 @@ services:
     image: ghcr.io/derekwinters/chores-web-backend:${PREV_TAG}
     environment:
       DATABASE_URL: postgresql+asyncpg://chores:chores@db/chores
+      JWT_SECRET: upgrade-test-secret
     depends_on:
       db:
         condition: service_healthy
