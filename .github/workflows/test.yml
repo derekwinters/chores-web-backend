@@ -128,10 +128,11 @@ jobs:
         run: |
           docker compose -f docker-compose.test-upgrade.yml up --build -d
           docker compose -f docker-compose.test-upgrade.yml wait validate
-      - name: Collect validate service logs on failure
+      - name: Collect upgrade test logs on failure
         if: failure()
         run: |
-          docker compose -f docker-compose.test-upgrade.yml logs new-backend validate || true
+          docker compose -f docker-compose.test-upgrade.yml ps -a || true
+          docker compose -f docker-compose.test-upgrade.yml logs old-backend seed new-backend validate || true
       - name: Tear down upgrade test containers
         if: always()
         run: |
