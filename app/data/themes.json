@@ -1,5 +1,5 @@
 {
-  "_source": "@chores/design-tokens@0.1.0",
+  "_source": "@derekwinters/design-tokens@0.2.1",
   "dark": {
     "bg": "#080c14",
     "surface": "#16202e",

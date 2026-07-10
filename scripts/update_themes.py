@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Refresh the vendored built-in theme palettes from @chores/design-tokens.
+"""Refresh the vendored built-in theme palettes from @derekwinters/design-tokens.
 
 The six built-in palettes served by /theme are design data owned by the
 chores-web-design-tokens repo. This script downloads a pinned release of the
@@ -20,7 +20,7 @@ import tarfile
 import tempfile
 from pathlib import Path
 
-PACKAGE = "@chores/design-tokens"
+PACKAGE = "@derekwinters/design-tokens"
 TARGET = Path(__file__).resolve().parent.parent / "app" / "data" / "themes.json"
 
 
