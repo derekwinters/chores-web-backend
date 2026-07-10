@@ -1,4 +1,4 @@
-"""Built-in theme palettes are vendored from @chores/design-tokens (values-only).
+"""Built-in theme palettes are vendored from @derekwinters/design-tokens (values-only).
 
 See derekwinters/chores-web-backend#21 / master rollout derekwinters/chores-web-docs#11:
 the token repo is the source of truth for the six built-in palettes; this backend
@@ -40,7 +40,7 @@ def vendored_themes():
 
 def test_vendored_file_pins_its_token_source():
     meta = load_vendored().get("_source", "")
-    assert "@chores/design-tokens@" in meta
+    assert "@derekwinters/design-tokens@" in meta
 
 
 def test_vendored_file_has_exactly_the_builtin_themes():
@@ -80,4 +80,4 @@ def test_theme_module_contains_no_hardcoded_palette_hex():
 def test_update_script_exists_and_names_the_package():
     assert UPDATE_SCRIPT.exists(), "scripts/update_themes.py must exist"
     text = UPDATE_SCRIPT.read_text()
-    assert "@chores/design-tokens" in text
+    assert "@derekwinters/design-tokens" in text
