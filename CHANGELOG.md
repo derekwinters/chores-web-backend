@@ -1,5 +1,24 @@
 # Changelog
 
+## [2.2.0](https://github.com/derekwinters/chores-web-backend/compare/v2.1.0...v2.2.0) (2026-07-10)
+
+
+### Features
+
+* source built-in theme palettes from the design-tokens artifact ([#23](https://github.com/derekwinters/chores-web-backend/issues/23)) ([b3652f1](https://github.com/derekwinters/chores-web-backend/commit/b3652f152de419d5a2fe16f9a3247b85b211dee3))
+
+
+### Bug Fixes
+
+* track renamed npm package @derekwinters/design-tokens ([#24](https://github.com/derekwinters/chores-web-backend/issues/24)) ([983fd89](https://github.com/derekwinters/chores-web-backend/commit/983fd89c139a0bdd25fb825d41e94b286cf76950))
+
+
+### CI/CD
+
+* add dependabot configuration ([#2](https://github.com/derekwinters/chores-web-backend/issues/2)) ([57ed61c](https://github.com/derekwinters/chores-web-backend/commit/57ed61c4734988003981647d893ed37ce6e3d930))
+* fix upgrade-regression job — old-backend env and seed.py /v1 paths ([#26](https://github.com/derekwinters/chores-web-backend/issues/26)) ([86f3206](https://github.com/derekwinters/chores-web-backend/commit/86f320620d8a33a63183d03861d142e93938f8d7)), closes [#25](https://github.com/derekwinters/chores-web-backend/issues/25)
+* group dependabot updates and add 14-day cooldown ([#19](https://github.com/derekwinters/chores-web-backend/issues/19)) ([76f1c76](https://github.com/derekwinters/chores-web-backend/commit/76f1c768ef6f778501a984238de350ccefc270ea))
+
 ## [2.1.0](https://github.com/derekwinters/chores-web-backend/compare/v2.0.1...v2.1.0) (2026-07-09)
 
 

@@ -1,7 +1,7 @@
 from pydantic_settings import BaseSettings
 
 # Current application version
-APP_VERSION = "2.1.0"  # x-release-please-version
+APP_VERSION = "2.2.0"  # x-release-please-version
 
 
 class Settings(BaseSettings):
