@@ -25,7 +25,7 @@ async def seed(base_url: str = BASE) -> None:
         # Step 1: Login (auto-creates admin on first login if no users exist)
         # ------------------------------------------------------------------
         print("Logging in as admin...")
-        login_r = await c.post("/auth/login", json={"username": "admin", "password": "adminpass123"})
+        login_r = await c.post("/v1/auth/login", json={"username": "admin", "password": "adminpass123"})
         if login_r.status_code != 200:
             print(f"Login failed: {login_r.status_code} {login_r.text}", file=sys.stderr)
             sys.exit(1)
@@ -44,7 +44,7 @@ async def seed(base_url: str = BASE) -> None:
         ]
         person_ids: dict[str, int] = {}
         for p in people:
-            r = await c.post("/people", json=p)
+            r = await c.post("/v1/people", json=p)
             if r.status_code in (200, 201):
                 person_ids[p["name"]] = r.json()["id"]
                 print(f"Person {p['name']}: {r.status_code}")
@@ -94,7 +94,7 @@ async def seed(base_url: str = BASE) -> None:
 
         chore_ids: dict[str, int] = {}
         for chore in chores_data:
-            r = await c.post("/chores", json=chore)
+            r = await c.post("/v1/chores", json=chore)
             if r.status_code in (200, 201):
                 chore_ids[chore["name"]] = r.json()["id"]
                 print(f"Chore '{chore['name']}': {r.status_code}")
@@ -114,8 +114,8 @@ async def seed(base_url: str = BASE) -> None:
         print("\nSeeding completions...")
         for chore_name, chore_id in chore_ids.items():
             # Force state to due before completing
-            await c.put(f"/chores/{chore_id}", json={"state": "due"})
-            r = await c.post(f"/chores/{chore_id}/complete", json={"completed_by": "admin"})
+            await c.put(f"/v1/chores/{chore_id}", json={"state": "due"})
+            r = await c.post(f"/v1/chores/{chore_id}/complete", json={"completed_by": "admin"})
             print(f"  Complete '{chore_name}': {r.status_code}")
 
         # ------------------------------------------------------------------
@@ -124,15 +124,15 @@ async def seed(base_url: str = BASE) -> None:
         print("\nSeeding skips...")
         trash_id = chore_ids.get("Take out trash")
         if trash_id:
-            await c.put(f"/chores/{trash_id}", json={"state": "due"})
-            r = await c.post(f"/chores/{trash_id}/skip")
+            await c.put(f"/v1/chores/{trash_id}", json={"state": "due"})
+            r = await c.post(f"/v1/chores/{trash_id}/skip")
             print(f"  Skip 'Take out trash': {r.status_code}")
 
         # Also skip the lawn chore
         lawn_id = chore_ids.get("Mow lawn")
         if lawn_id:
-            await c.put(f"/chores/{lawn_id}", json={"state": "due"})
-            r = await c.post(f"/chores/{lawn_id}/skip")
+            await c.put(f"/v1/chores/{lawn_id}", json={"state": "due"})
+            r = await c.post(f"/v1/chores/{lawn_id}/skip")
             print(f"  Skip 'Mow lawn': {r.status_code}")
 
         # ------------------------------------------------------------------
@@ -142,7 +142,7 @@ async def seed(base_url: str = BASE) -> None:
         vacuum_id = chore_ids.get("Vacuum downstairs")
         if vacuum_id:
             # Get current chore state to know who it's assigned to
-            chore_r = await c.get(f"/chores/{vacuum_id}")
+            chore_r = await c.get(f"/v1/chores/{vacuum_id}")
             if chore_r.status_code == 200:
                 current = chore_r.json().get("current_assignee")
                 # Reassign to the next person in the rotation
@@ -152,7 +152,7 @@ async def seed(base_url: str = BASE) -> None:
                     new_assignee = eligible[(idx + 1) % len(eligible)]
                 else:
                     new_assignee = "Amy"
-                r = await c.post(f"/chores/{vacuum_id}/reassign", json={"assignee": new_assignee})
+                r = await c.post(f"/v1/chores/{vacuum_id}/reassign", json={"assignee": new_assignee})
                 print(f"  Reassign 'Vacuum downstairs' → {new_assignee}: {r.status_code}")
 
         # ------------------------------------------------------------------
@@ -162,12 +162,12 @@ async def seed(base_url: str = BASE) -> None:
         # Update points on 'Clean bathrooms'
         bath_id = chore_ids.get("Clean bathrooms")
         if bath_id:
-            r = await c.put(f"/chores/{bath_id}", json={"points": 6})
+            r = await c.put(f"/v1/chores/{bath_id}", json={"points": 6})
             print(f"  Amend 'Clean bathrooms' points → 6: {r.status_code}")
 
         # Update schedule interval on 'Mow lawn'
         if lawn_id:
-            r = await c.put(f"/chores/{lawn_id}", json={
+            r = await c.put(f"/v1/chores/{lawn_id}", json={
                 "schedule_type": "interval",
                 "schedule_config": {"days": 10},
             })
