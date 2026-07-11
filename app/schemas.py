@@ -486,6 +486,20 @@ class UpdateCheckStatus(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class VersionOut(BaseModel):
+    """Public, unauthenticated self-version payload for GET /version.
+
+    Same trust tier as /health — no admin/auth-gated fields (check_enabled,
+    check_interval_hours) are exposed here, unlike UpdateCheckStatus.
+    """
+    version: str
+    latest_version: Optional[str] = None
+    update_available: bool = False
+    checked_at: Optional[datetime] = None
+
+    model_config = {"from_attributes": True}
+
+
 # ── Auth Log ─────────────────────────────────────────────────────────────────
 
 class AuthLogOut(BaseModel):

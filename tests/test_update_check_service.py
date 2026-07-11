@@ -1,17 +1,54 @@
 """Tests for update check service."""
 import pytest
 from datetime import datetime, timedelta
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import UpdateCheck
 from app.services.update_check_service import (
+    GITHUB_API_URL,
     check_for_updates,
     get_update_status,
     configure_update_check,
+    _get_github_latest_version,
     _version_cache,
 )
+
+
+def test_github_api_url_targets_backend_repo():
+    """The release-check target must be derekwinters/chores-web-backend, not the
+    pre-split monorepo (derekwinters/chores-web)."""
+    assert GITHUB_API_URL == "https://api.github.com/repos/derekwinters/chores-web-backend/releases/latest"
+    assert "chores-web-backend" in GITHUB_API_URL
+    assert not GITHUB_API_URL.endswith("/repos/derekwinters/chores-web/releases/latest")
+
+
+@pytest.mark.asyncio
+async def test_get_github_latest_version_queries_correct_repo_url():
+    """The HTTP call made to fetch the latest release must hit the backend repo's
+    releases endpoint, not the old monorepo's."""
+    _version_cache["latest_version"] = None
+    _version_cache["cached_at"] = None
+
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {"tag_name": "v9.9.9"}
+
+    mock_client = AsyncMock()
+    mock_client.get = AsyncMock(return_value=mock_response)
+    mock_client.__aenter__.return_value = mock_client
+    mock_client.__aexit__.return_value = None
+
+    with patch(
+        "app.services.update_check_service.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
+        version = await _get_github_latest_version(force=True)
+
+    mock_client.get.assert_called_once_with(GITHUB_API_URL)
+    assert "chores-web-backend" in mock_client.get.call_args[0][0]
+    assert version == "9.9.9"
 
 
 @pytest.mark.asyncio

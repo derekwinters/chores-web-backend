@@ -11,7 +11,7 @@ from ..config import APP_VERSION
 logger = logging.getLogger(__name__)
 
 # GitHub API endpoint for releases
-GITHUB_API_URL = "https://api.github.com/repos/derekwinters/chores-web/releases/latest"
+GITHUB_API_URL = "https://api.github.com/repos/derekwinters/chores-web-backend/releases/latest"
 
 # In-memory cache for version info
 _version_cache = {
@@ -141,6 +141,28 @@ async def get_update_status(db: AsyncSession) -> dict:
         "check_enabled": update_check.check_enabled,
         "check_interval_hours": update_check.check_interval_hours,
         "update_available": update_available,
+    }
+
+
+async def get_public_version_info(db: AsyncSession) -> dict:
+    """Public-facing subset of get_update_status(), for the unauthenticated
+    GET /version endpoint.
+
+    This is a thin, read-only reshape of the same underlying (cached) status
+    data used by /config/updates/status — it does not perform its own GitHub
+    fetch. Because it never talks to GitHub directly, a GitHub-side failure
+    (timeout, rate limit, network error) can never surface here as a 500: at
+    worst, latest_version/checked_at simply reflect "no successful check yet"
+    (both None, update_available False), which is the same state a fresh
+    install reports and is indistinguishable-by-design from a transient
+    upstream failure that hasn't been retried yet.
+    """
+    status = await get_update_status(db)
+    return {
+        "version": status["current_version"],
+        "latest_version": status["latest_version"],
+        "update_available": status["update_available"],
+        "checked_at": status["last_checked_at"],
     }
 
 
