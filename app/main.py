@@ -2,16 +2,19 @@ import logging
 import sys
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy.ext.asyncio import AsyncSession
 from starlette_prometheus import PrometheusMiddleware
 
-from .database import engine
+from .database import engine, get_db
 from .models import Base
 from .routers import auth, chores, people, points, log, config, theme, export, data_import, status, admin_db, metrics
+from .schemas import VersionOut
 from .services.scheduler import start_scheduler, stop_scheduler
 from .services.chore_service import transition_overdue_chores, normalize_points_log_persons
+from .services.update_check_service import get_public_version_info
 from .database import AsyncSessionLocal
 from .migrations import apply_migrations
 
@@ -92,3 +95,17 @@ app.include_router(metrics.router)
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+
+@app.get("/version", response_model=VersionOut)
+async def get_version(db: AsyncSession = Depends(get_db)):
+    """Public, unauthenticated backend self-version check.
+
+    Same trust tier as /health — no Authorization required. Used by
+    chores-web-frontend / chores-web-android to show "Backend version" on
+    their About screens; a real "not yet checked" state (null
+    latest_version/checked_at) is a normal response here, distinct from this
+    route not existing at all (old backends predating this endpoint).
+    """
+    info = await get_public_version_info(db)
+    return VersionOut(**info)
