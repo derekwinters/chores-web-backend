@@ -72,8 +72,14 @@ jobs:
         env:
           JWT_SECRET: ci-check-only
       - name: Install oasdiff
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          OASDIFF_VERSION=$(curl -s https://api.github.com/repos/oasdiff/oasdiff/releases/latest | grep '"tag_name"' | cut -d'"' -f4)
+          OASDIFF_VERSION=$(curl -sSfL -H "Authorization: Bearer ${GH_TOKEN}" https://api.github.com/repos/oasdiff/oasdiff/releases/latest | grep '"tag_name"' | cut -d'"' -f4)
+          if [ -z "$OASDIFF_VERSION" ]; then
+            echo "::error::Failed to resolve the latest oasdiff release tag from the GitHub API" >&2
+            exit 1
+          fi
           OASDIFF_VERSION_TRIMMED=${OASDIFF_VERSION#v}
           curl -sSfL "https://github.com/oasdiff/oasdiff/releases/download/${OASDIFF_VERSION}/oasdiff_${OASDIFF_VERSION_TRIMMED}_linux_amd64.tar.gz" -o /tmp/oasdiff.tar.gz
           tar -xzf /tmp/oasdiff.tar.gz -C /usr/local/bin oasdiff
