@@ -67,6 +67,42 @@ Available at `GET /v1/auth/log` (admin only).
 ## Releases
 
 Versioning is automated with release-please (config under
-`.github/release-please/`). The squash-merged PR title is the conventional
-commit that drives version bumps. Releases publish
+`.github/release-please/`), which parses commit messages on `main` to
+compute version bumps and changelog entries. Releases publish
 `ghcr.io/derekwinters/chores-web-backend`.
+
+### Conventional Commits are mandatory
+
+Every commit that lands on `main` MUST be Conventional Commits format —
+this is a hard requirement, not a style preference. This applies above all
+to squash-merge titles, since the squash title becomes the one commit
+release-please ever sees for that PR.
+
+Format: `type(scope): description`, where `type` is one of `feat`, `fix`,
+`chore`, `ci`, `docs`, `build`, `refactor`, `test`, `perf`, `revert`.
+
+Pick `type` based on the actual semver impact of the change, not on
+whatever the PR title happens to say:
+- A new public API endpoint is `feat`, even if the same PR also fixes a
+  bug along the way.
+- Never default to a missing or vague type, and never copy a PR title
+  into the squash-merge title verbatim unless that title is already
+  conventional. A non-conventional title that slips through is silently
+  invisible to release-please — it will not appear in the changelog and
+  will not trigger the version bump it should.
+
+Before merging, either fix the PR title/squash message yourself or ask
+for it to be fixed. There is no follow-up step that repairs this later.
+
+### Commit-authoring work must be delegated
+
+An orchestrating/main Claude Code session must not author commits itself.
+Writing the change, crafting the commit message, and opening the PR are
+implementation work and belong to a delegated implementation agent. The
+orchestrating session's job is to delegate that work, review CI results,
+and merge — it does not write code or commit messages directly.
+
+This still leaves the orchestrating session responsible for the
+squash-merge title at merge time: it must apply the Conventional Commits
+rule above to whichever title it chooses, and copying the PR's title
+verbatim is only correct when that title is already conventional.
