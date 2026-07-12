@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.3.0](https://github.com/derekwinters/chores-web-backend/compare/v2.2.0...v2.3.0) (2026-07-12)
+
+
+### Features
+
+* retroactively document cb19143 for release-please ([98953ec](https://github.com/derekwinters/chores-web-backend/commit/98953ec2a7ee8994e010f3d88a3cda546f38391e))
+
+
+### Documentation
+
+* require conventional commits and agent-delegated commit work ([77c026e](https://github.com/derekwinters/chores-web-backend/commit/77c026e4d625676432cf717a05ff7bb6dcc669d5))
+
 ## [2.2.0](https://github.com/derekwinters/chores-web-backend/compare/v2.1.0...v2.2.0) (2026-07-10)
 
 
