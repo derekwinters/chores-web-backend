@@ -1,0 +1,76 @@
+name: github-issue-validate-feature
+description: Validate feature requests against 6 strict requirements
+version: 1.0.0
+
+input:
+  - name: issue_number
+    type: number
+    description: GitHub issue number to validate
+
+output:
+  type: json
+  schema:
+    type: object
+    properties:
+      valid:
+        type: boolean
+      missing_fields:
+        type: array
+        items:
+          type: string
+      questionable_na_fields:
+        type: array
+        items:
+          type: string
+      target_labels:
+        type: array
+        items:
+          type: string
+      suggestions:
+        type: array
+        items:
+          type: string
+      confidence:
+        type: number
+        minimum: 0
+        maximum: 1
+
+instructions: |
+  Validate feature request against 6 strict requirements.
+
+  Strict Requirements:
+  1. Use case/motivation (why is this needed)
+  2. Description/overview (what is the feature)
+  3. Expected behavior/workflow (how should it work)
+  4. Acceptance criteria (how do we know it's done)
+  5. Edge cases/constraints (corner cases, limits, compatibility)
+  6. Performance/scalability considerations (if applicable)
+
+  N/A Validation:
+  - Accept "N/A" only if justified for feature scope
+  - Flag unjustified N/A as questionable (e.g., "N/A for payment feature")
+  - Examples:
+    - "Performance: N/A" for simple button → justified
+    - "Edge cases: N/A" for payment feature → questionable
+
+  Process:
+  1. Fetch issue using: gh issue view <issue-number> --json title,body
+  2. Check all 6 fields present with content
+  3. For N/A fields, assess justification based on feature scope
+  4. Collect missing fields and questionable N/As
+  5. Determine target labels:
+     - Always include "feature"
+     - Add "needs-info" if missing or unjustified N/A fields
+  6. Generate suggestions
+  7. Calculate confidence
+  8. Return JSON output only
+
+  Output Format:
+  {
+    "valid": boolean,
+    "missing_fields": ["field1"],
+    "questionable_na_fields": ["field2"],
+    "target_labels": ["feature", "needs-info"],
+    "suggestions": ["suggestion1"],
+    "confidence": 0.0-1.0
+  }

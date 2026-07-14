@@ -1,0 +1,27 @@
+name: github-issue-validate-refactor
+description: Validate refactor requests against 3 core requirements
+version: 1.0.0
+
+input:
+  - name: issue_number
+    type: number
+    description: GitHub issue number to validate
+
+output:
+  type: json
+
+instructions: |
+  Validate refactor request against 3 core requirements (lighter than features).
+
+  Core Requirements:
+  1. Scope (what's changing: files, modules, components)
+  2. Rationale (efficiency gains, why refactor now)
+  3. Risk assessment (what could break, regressions)
+
+  N/A rarely acceptable (internal work).
+
+  Process:
+  1. Fetch issue: gh issue view <issue-number> --json title,body
+  2. Check 3 fields present
+  3. Target labels: "refactor" + "needs-info" if invalid
+  4. Return JSON with valid status, missing fields, target labels

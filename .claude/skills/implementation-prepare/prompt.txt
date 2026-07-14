@@ -1,0 +1,34 @@
+Prepare git branch for issue implementation.
+
+Inputs: issue_number, commit_type, branch (required — never invented or derived by this skill; the caller always supplies the exact branch name)
+
+Steps:
+
+## When <branch> does NOT already exist locally or on origin (standalone mode):
+1. Fetch and update main: git fetch origin && git checkout main && git pull origin main
+2. Create the given branch: git checkout -b <branch>
+   Example: git checkout -b feat-issue-129
+3. Verify branch is active: git branch --show-current
+4. Report success:
+   - Branch name: <branch>
+   - Status: Ready for implementation
+   - Next: Begin implementation per issue requirements
+
+## When <branch> already exists locally or on origin (milestone mode / resumed work):
+1. Fetch and update branch: git fetch origin && git checkout <branch> && git pull origin <branch>
+2. Verify branch is active: git branch --show-current
+3. Report success:
+   - Branch name: <branch> (existing)
+   - Status: Ready for implementation (shared branch — e.g. milestone mode)
+   - Next: Begin implementation per issue requirements
+
+Alembic-migration reminder:
+- If the change will touch app/models.py, a matching Alembic revision must be added under
+  alembic/versions/ (python -m alembic revision --autogenerate -m "..." — see MIGRATIONS.md).
+  Flag this at prepare time so it is not forgotten; a schema change with no migration is
+  incomplete and will be caught at verify.
+
+Error cases:
+- <branch> not supplied: ABORT — this skill never invents a branch name
+- Git fetch/pull fails: Report network or permission issue
+- Branch creation fails: Report git error
