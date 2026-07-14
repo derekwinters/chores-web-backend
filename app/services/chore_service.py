@@ -10,7 +10,7 @@ from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models import Chore, PointsLog, ChoreLog, Person
+from ..models import Chore, PointsLog, ChoreLog, Person, Notification, NotificationPreference
 from ..scheduling import build_schedule
 
 logger = logging.getLogger(__name__)
@@ -22,6 +22,9 @@ CHANGE_FORCED_DUE = "forced_due"
 CHANGE_MARKED_DUE = "marked_due"
 CHANGE_CREATED = "created"
 CHANGE_DELETED = "deleted"
+
+# v1 has exactly one server-generated notification type.
+NOTIFICATION_TYPE_CHORE_DUE = "chore_due"
 
 
 async def normalize_points_log_persons(db: AsyncSession) -> None:
@@ -451,8 +454,113 @@ async def mark_due_chore(chore: Chore, db: AsyncSession, marked_by: Optional[str
     return chore
 
 
+def _relevant_usernames(chore: Chore) -> list[str]:
+    """Usernames of the people a due Chore should notify.
+
+    - Assigned chore (fixed/rotating) with a current_assignee -> just that person.
+    - Open chore (current_assignee is None) -> every username in eligible_people.
+    - Open chore with empty eligible_people -> nobody.
+    """
+    if chore.current_assignee:
+        return [chore.current_assignee]
+    return list(chore.eligible_people or [])
+
+
+async def _generate_chore_due_notifications(db: AsyncSession, chores: list[Chore]) -> int:
+    """Create one chore_due Notification per relevant person for each transitioned chore.
+
+    Recipients are resolved from usernames to Person.id. A recipient with an
+    explicit NotificationPreference(type=chore_due, enabled=False) row is skipped;
+    an absent row means enabled. Rows are added to the session but not committed —
+    the caller commits in the same transaction as the due transition.
+    """
+    if not chores:
+        return 0
+
+    # Map username -> person id for all people (reference columns store usernames).
+    people_result = await db.execute(select(Person))
+    username_to_id = {p.username: p.id for p in people_result.scalars().all()}
+
+    # People who have explicitly disabled chore_due notifications.
+    pref_result = await db.execute(
+        select(NotificationPreference.person_id).where(
+            NotificationPreference.type == NOTIFICATION_TYPE_CHORE_DUE,
+            NotificationPreference.enabled == False,  # noqa: E712 — SQL boolean comparison
+        )
+    )
+    opted_out_ids = set(pref_result.scalars().all())
+
+    now = _now()
+    created = 0
+    for chore in chores:
+        for username in _relevant_usernames(chore):
+            person_id = username_to_id.get(username)
+            if person_id is None:
+                continue
+            if person_id in opted_out_ids:
+                continue
+            db.add(
+                Notification(
+                    person_id=person_id,
+                    type=NOTIFICATION_TYPE_CHORE_DUE,
+                    chore_id=chore.id,
+                    title=chore.name,
+                    body=f'The chore "{chore.name}" is now due.',
+                    created_at=now,
+                    delivered_at=None,
+                    acknowledged_at=None,
+                    dismissed_at=None,
+                )
+            )
+            created += 1
+    return created
+
+
+async def _dismiss_stale_notifications(db: AsyncSession) -> int:
+    """Dismiss unacknowledged chore_due notifications whose chore is no longer due.
+
+    Sets dismissed_at on every chore_due Notification where acknowledged_at IS NULL
+    and dismissed_at IS NULL and the referenced chore is no longer due (state != "due"
+    or the chore no longer exists). Acknowledged rows are never touched. Rows are
+    updated on the session but not committed — the caller commits.
+    """
+    result = await db.execute(
+        select(Notification).where(
+            Notification.type == NOTIFICATION_TYPE_CHORE_DUE,
+            Notification.acknowledged_at.is_(None),
+            Notification.dismissed_at.is_(None),
+        )
+    )
+    candidates = result.scalars().all()
+    if not candidates:
+        return 0
+
+    chore_ids = {n.chore_id for n in candidates if n.chore_id is not None}
+    still_due_ids: set[int] = set()
+    if chore_ids:
+        chore_result = await db.execute(
+            select(Chore.id).where(Chore.id.in_(chore_ids), Chore.state == "due")
+        )
+        still_due_ids = set(chore_result.scalars().all())
+
+    now = _now()
+    dismissed = 0
+    for notification in candidates:
+        if notification.chore_id in still_due_ids:
+            continue
+        notification.dismissed_at = now
+        db.add(notification)
+        dismissed += 1
+    return dismissed
+
+
 async def transition_overdue_chores(db: AsyncSession) -> int:
-    """Flip complete chores to due when next_due <= today. Returns count changed."""
+    """Flip complete chores to due when next_due <= today. Returns count changed.
+
+    In the same transaction this also generates chore_due notifications for the
+    people relevant to each transitioned chore, and dismisses stale unacknowledged
+    chore_due notifications whose chore is no longer due.
+    """
     today = date.today()
     result = await db.execute(
         select(Chore).where(Chore.state == "complete", Chore.next_due <= today)
@@ -464,7 +572,11 @@ async def transition_overdue_chores(db: AsyncSession) -> int:
         chore.last_change_type = CHANGE_FORCED_DUE
         await _log_action(chore, CHANGE_MARKED_DUE, "schedule", db)
         db.add(chore)
-    if chores:
+
+    notifications_created = await _generate_chore_due_notifications(db, chores)
+    dismissed = await _dismiss_stale_notifications(db)
+
+    if chores or dismissed:
         try:
             await db.commit()
         except IntegrityError as e:
@@ -478,4 +590,10 @@ async def transition_overdue_chores(db: AsyncSession) -> int:
             await db.rollback()
             logger.exception("Unexpected error during overdue chore transition")
             raise
+
+    if notifications_created:
+        logger.info("Generated %d chore_due notification(s)", notifications_created)
+    if dismissed:
+        logger.info("Dismissed %d stale notification(s)", dismissed)
+
     return len(chores)

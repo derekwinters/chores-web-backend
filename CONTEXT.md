@@ -40,6 +40,26 @@ _Avoid_: Score log, history
 Unified audit trail of all chore events: completions, skips, reassignments, amendments, and config changes. Backed by ChoreLog and UserLog merged at query time.
 _Avoid_: Event log, audit log, history
 
+**Notification**:
+A per-person record that a Chore became due. Generated server-side by the scheduled due-transition job, one per relevant person per Chore it flips to due. v1's only server type is `chore_due`.
+_Avoid_: Alert, reminder, message
+
+**Delivery**:
+The server-recorded event of a Notification first being returned to a client (`delivered_at`). The server owns delivery state; a Notification is delivered at most once.
+_Avoid_: Send, push, fetch
+
+**Acknowledgement**:
+The person's explicit confirmation of a Notification (`acknowledged_at`). An acknowledged Notification is never dismissed by the server.
+_Avoid_: Read, seen, confirm (as a bare verb)
+
+**Dismissal**:
+Server-side retirement of a stale, unacknowledged Notification whose Chore is no longer due (`dismissed_at`). A Notification dismissed before Delivery is never delivered.
+_Avoid_: Delete, clear, expire
+
+**Notification Preference**:
+A person's per-type opt-out from Notifications. An absent row means enabled; a row exists only to record an explicit choice, and generation skips a person only when a row exists with `enabled = false` for that type.
+_Avoid_: Setting, subscription, mute
+
 ## Relationships
 
 - A **Chore** produces one **Points Log** entry per **Completion**
@@ -47,6 +67,8 @@ _Avoid_: Event log, audit log, history
 - An **Amendment** appends one **Activity Log** entry with action `amended` without modifying the original `completed` entry
 - A **Reassignment** applies only to due Chores and never touches the **Points Log**
 - A **Completer** is the Assignee when `current_assignee` is set; when `current_assignee === null`, the Completer is selected explicitly at Completion time
+- A **Chore** flipped to due by the scheduled job produces one **Notification** per relevant person (the Assignee, or every eligible person for an open Chore), skipping anyone with a disabling **Notification Preference**
+- A **Notification** progresses through **Delivery** and either **Acknowledgement** (by the person) or **Dismissal** (by the server when its Chore is no longer due and it was never acknowledged)
 
 ## Example dialogue
 
