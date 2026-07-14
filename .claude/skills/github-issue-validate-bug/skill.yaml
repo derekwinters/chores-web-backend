@@ -1,0 +1,65 @@
+name: github-issue-validate-bug
+description: Validate bug reports against 8 strict requirements
+version: 1.0.0
+
+input:
+  - name: issue_number
+    type: number
+    description: GitHub issue number to validate
+
+output:
+  type: json
+  schema:
+    type: object
+    properties:
+      valid:
+        type: boolean
+      missing_fields:
+        type: array
+        items:
+          type: string
+      target_labels:
+        type: array
+        items:
+          type: string
+      suggestions:
+        type: array
+        items:
+          type: string
+      confidence:
+        type: number
+        minimum: 0
+        maximum: 1
+
+instructions: |
+  Validate bug report for completeness against 8 strict requirements.
+
+  Strict Requirements:
+  1. Steps to reproduce (numbered, exact steps)
+  2. Expected behavior (what should happen)
+  3. Actual behavior (what actually happens)
+  4. Environment (OS, version, browser, app version)
+  5. Error messages/logs (stack traces, error details)
+  6. Screenshots (visual evidence)
+  7. Frequency (always/sometimes/rarely)
+  8. Severity/impact assessment (critical/high/medium/low)
+
+  Process:
+  1. Fetch issue using: gh issue view <issue-number> --json title,body
+  2. Check all 8 fields are present with substantive content
+  3. Collect missing fields list
+  4. Determine target labels:
+     - Always include "bug"
+     - Add "needs-info" if any fields missing
+  5. Generate suggestions for missing fields
+  6. Calculate confidence (1.0 if valid, lower if ambiguous)
+  7. Return JSON output only
+
+  Output Format:
+  {
+    "valid": boolean,
+    "missing_fields": ["field1", "field2"],
+    "target_labels": ["bug", "needs-info"],
+    "suggestions": ["suggestion1"],
+    "confidence": 0.0-1.0
+  }

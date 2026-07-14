@@ -1,0 +1,48 @@
+name: github-issue-categorize
+description: Analyze GitHub issue to determine type and effort estimate
+version: 1.0.0
+
+input:
+  - name: issue_number
+    type: number
+    description: GitHub issue number to analyze
+
+output:
+  type: json
+  schema:
+    type: object
+    properties:
+      type:
+        type: string
+        enum: [bug, feature, refactor, chore]
+      effort:
+        type: string
+        enum: [small, medium, large]
+      confidence_type:
+        type: number
+        minimum: 0
+        maximum: 1
+      confidence_effort:
+        type: number
+        minimum: 0
+        maximum: 1
+      reasoning:
+        type: string
+
+instructions: |
+  Analyze the GitHub issue to determine its type and effort estimate.
+
+  Process:
+  1. Fetch issue using: gh issue view <issue-number> --json title,body
+  2. Extract title and body content
+  3. Categorize type based on keywords and context:
+     - bug: Fix, broken, crash, error, issue, regression, problem
+     - feature: Add, implement, new, support, enable, allow
+     - refactor: Refactor, improve, cleanup, optimize, restructure
+     - chore: Update, deps, docs, maintenance, tooling
+  4. Estimate effort:
+     - small: Simple, isolated, <50 lines, <1 hour
+     - medium: Moderate scope, multiple files, 50-200 lines, 1-4 hours
+     - large: Complex, multiple components, >200 lines, >4 hours
+  5. Provide confidence scores (0.0-1.0) for both type and effort
+  6. Return JSON output only

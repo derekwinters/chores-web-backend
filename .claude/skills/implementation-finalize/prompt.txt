@@ -1,0 +1,68 @@
+Push branch to origin and create pull request.
+
+Inputs: issue_number, commit_type
+Optional: existing_pr
+
+This skill does NOT stage or commit. Commits are made at earlier stages
+(doc-pre, code-commit after user approval, and doc-validate if corrections are
+needed). This skill only pushes and opens the PR.
+
+Steps:
+
+## When existing_pr is NOT provided (default):
+1. Push branch: git push -u origin <branch>
+2. Create PR:
+   - Title: conventional commit subject — <type>: <description> (#<number>)
+   - Body format (opens with the Deviations and Decisions block the orchestrator
+     composed at its reflect state; present even when empty, `None.` under any
+     empty subsection):
+
+     ## Deviations and Decisions
+
+     ### Deviations
+     - **<file/area>**: <what deviated from the contract and why>.
+
+     ### Decisions
+     - **<ambiguity>**: <how it was resolved>.  Prevention: <what would prevent recurrence>.
+
+     ## Summary
+     - <bullet points summarizing changes>
+
+     ## Implementation
+     - Backend: <what changed>
+     - Tests: <what was tested>
+
+     Closes #<issue-number>
+
+   - Important: each Closes statement on its own line (not comma-separated)
+3. Remove in-development label: gh issue edit <N> --remove-label "in-development"
+4. Return PR URL: https://github.com/derekwinters/chores-web-backend/pull/<pr-number>
+
+Success output:
+✅ PR Created
+- Commit: feat: Add flexible skip options for chores (#129)  (made at earlier stages)
+- Branch: feat-issue-129
+- PR URL: https://github.com/derekwinters/chores-web-backend/pull/168
+
+## When existing_pr IS provided (milestone mode):
+1. Push to existing shared branch: git push
+2. Do NOT create a PR and do NOT touch the PR body — in milestone mode the
+   milestone orchestrator owns the PR body exclusively (full template + Closes
+   list written up front, checkboxes ticked and per-issue Deviations and
+   Decisions subsections appended as issues complete). This skill only reports a
+   summary back to its caller.
+3. Return PR URL and a short summary (issue number, title, commit subject) for
+   the milestone orchestrator to use when it ticks the issue's checkbox. The
+   orchestrator supplies the reflect-composed `## Deviations and Decisions`
+   block separately (from its reflect state); this skill does not compose it.
+
+Success output (milestone mode):
+✅ Issue pushed to shared branch
+- Commit: feat: Add flexible skip options for chores (#129)  (made at earlier stages)
+- Branch: claude/milestone-<number>-<randomid> (shared)
+- PR URL: https://github.com/derekwinters/chores-web-backend/pull/168 (body unchanged — owned by milestone orchestrator)
+- Summary for caller: Issue #129 — <title> — <commit_subject>
+
+Failure cases:
+- Push fails: Report network/permission error
+- PR creation/update fails: Report API error

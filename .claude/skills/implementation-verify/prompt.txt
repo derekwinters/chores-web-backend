@@ -1,0 +1,52 @@
+Verify the backend test suite and API contract, then show a changes summary for user review.
+
+Input: issue_number (optional)
+
+Steps:
+1. Run tests: pytest (config in pytest.ini: asyncio_mode = auto, testpaths = tests)
+2. Regenerate the OpenAPI schema and check for contract drift:
+   - python scripts/generate_openapi.py --output <tmp>/openapi.json
+   - Diff <tmp>/openapi.json against the chores-web-docs golden snapshot (docs/api/openapi.json)
+   - If they differ, flag contract drift: the golden snapshot in chores-web-docs must be updated (and API_VERSION bumped for breaking changes) — see CLAUDE.md's Breaking Change Ritual
+3. Alembic-migration reminder: if app/models.py changed, confirm a matching revision exists in alembic/versions/
+   (python -m alembic revision --autogenerate -m "..." — see MIGRATIONS.md). A model change with no new revision is a defect — flag it.
+4. Check exit codes: 0 = success; non-zero test run or a schema diff = flag it
+5. Prepare changes summary:
+   - git diff --stat to get file changes
+   - Count modified files
+   - Summarize what was changed (routers, models, schemas, services, scheduler, etc.)
+6. Show summary with:
+   - Issue number and title
+   - Files modified (with line counts)
+   - Summary of changes
+   - Test results (from previous step)
+   - API contract status
+   - Migration status (if app/models.py changed)
+7. Pause and ask user:
+   - Approve for commit?
+   - Request more changes?
+   - Abort?
+
+Output format:
+┌─────────────────────────────────────────┐
+│ Issue #42: Add chore list endpoint      │
+│ Verification Complete                   │
+└─────────────────────────────────────────┘
+
+Files Modified:
+- app/routers/chores.py: +85, -0 lines
+- app/schemas.py: +62, -0 lines
+- app/services/chores.py: +15, -2 lines
+- tests/test_chores.py: +48, -0 lines
+
+Summary:
+Added GET /api/v1/chores endpoint with a ChoreListResponse schema. Service layer fetches chores from the database and the router returns them. Tests cover the happy path and the empty-list case.
+
+Tests: ✅ All 45 tests passed
+API contract: ✅ Generated schema matches chores-web-docs golden snapshot
+Migrations: n/a (app/models.py unchanged)
+
+Ready to proceed?
+- [Approve for commit]
+- [Request changes]
+- [Abort]
