@@ -10,7 +10,7 @@ from starlette_prometheus import PrometheusMiddleware
 
 from .database import engine, get_db
 from .models import Base
-from .routers import auth, chores, people, points, log, config, theme, export, data_import, status, admin_db, metrics
+from .routers import auth, chores, people, points, log, config, theme, export, data_import, status, admin_db, metrics, notifications
 from .schemas import VersionOut
 from .services.scheduler import start_scheduler, stop_scheduler
 from .services.chore_service import transition_overdue_chores, normalize_points_log_persons
@@ -86,6 +86,7 @@ app.include_router(theme.router, prefix=V1_PREFIX)
 app.include_router(export.router, prefix=V1_PREFIX)
 app.include_router(data_import.router, prefix=V1_PREFIX)
 app.include_router(admin_db.router, prefix=V1_PREFIX)
+app.include_router(notifications.router, prefix=V1_PREFIX)
 # Status and metrics are unversioned — infrastructure, not API resources
 app.include_router(status.router)
 # Metrics router registered without auth dependency — public endpoint

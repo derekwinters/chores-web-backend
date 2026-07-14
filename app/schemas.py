@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any, Literal, Optional
 
-from pydantic import BaseModel, field_validator, model_validator
+from pydantic import BaseModel, RootModel, field_validator, model_validator
 import re
 import zoneinfo
 
@@ -528,6 +528,39 @@ class AdminDbPage(BaseModel):
     total: int
     offset: int
     limit: int
+
+
+# ── Notifications ────────────────────────────────────────────────────────────
+
+class NotificationOut(BaseModel):
+    id: int
+    person_id: int
+    type: str
+    chore_id: Optional[int] = None
+    title: str
+    body: str
+    created_at: datetime
+    delivered_at: Optional[datetime] = None
+    acknowledged_at: Optional[datetime] = None
+    dismissed_at: Optional[datetime] = None
+
+    model_config = {"from_attributes": True}
+
+
+class NotificationPreferencesOut(RootModel[dict[str, bool]]):
+    """Per-type enablement map, e.g. ``{"chore_due": true}``.
+
+    Every known notification type is present; a type with no stored
+    NotificationPreference row is reported as ``true`` (absent = enabled).
+    """
+
+
+class NotificationPreferencesUpdate(RootModel[dict[str, bool]]):
+    """Per-type enablement map accepted by ``PUT /notifications/preferences``.
+
+    Same shape as :class:`NotificationPreferencesOut`; keys naming unknown
+    types are ignored.
+    """
 
 
 # ── Theme ────────────────────────────────────────────────────────────────────
