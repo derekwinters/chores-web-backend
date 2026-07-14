@@ -141,3 +141,34 @@ class UpdateCheck(Base):
     last_checked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     check_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     check_interval_hours: Mapped[int] = mapped_column(Integer, nullable=False, default=24)
+
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    # References people.id (plain Integer, no DB-level FK — repo convention)
+    person_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    type: Mapped[str] = mapped_column(Text, nullable=False)
+    # References chores.id; nullable so a notification survives its chore's deletion
+    chore_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    # Set only by the list API (follow-up issue) — nothing writes it here.
+    delivered_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Set only by the ack API (follow-up issue).
+    acknowledged_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Set by the server-side stale-dismissal pass.
+    dismissed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class NotificationPreference(Base):
+    __tablename__ = "notification_preferences"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    # References people.id (plain Integer, no DB-level FK — repo convention)
+    person_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    type: Mapped[str] = mapped_column(Text, nullable=False)
+    # Absent row = enabled; a row exists only to record an explicit choice.
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False)
