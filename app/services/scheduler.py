@@ -14,6 +14,8 @@ logger = logging.getLogger(__name__)
 
 scheduler = AsyncIOScheduler()
 
+UPDATE_CHECK_JOB_ID = "periodic_update_check"
+
 
 async def _midnight_transition() -> None:
     async with AsyncSessionLocal() as db:
@@ -68,11 +70,35 @@ def start_scheduler(due_hour: int = 6, timezone: str = "UTC") -> None:
     scheduler.add_job(
         _periodic_update_check,
         IntervalTrigger(hours=24),
-        id="periodic_update_check",
+        id=UPDATE_CHECK_JOB_ID,
         replace_existing=True,
+        # Run promptly at startup. The jobstore is in-memory, so every process
+        # restart otherwise resets the interval clock to a fresh 24h — a
+        # container cycling more often than daily would never fire. The DB
+        # interval guard + version cache in check_for_updates prevent this from
+        # hammering GitHub on frequent restarts.
+        next_run_time=datetime.now(),
+        # Default misfire_grace_time is 1 second: if the process is briefly down
+        # or the loop is busy at the scheduled instant, APScheduler drops the
+        # slot and defers a full 24h. A 1h grace lets a recovering process still
+        # run the missed cycle.
+        misfire_grace_time=3600,
+        # Collapse multiple missed fires into a single catch-up run.
+        coalesce=True,
     )
     scheduler.start()
     logger.info("Scheduler started (due_hour=%d, timezone=%s)", due_hour, timezone)
+
+
+def get_update_check_next_run():
+    """Return the next scheduled run time of the periodic update-check job.
+
+    None when the scheduler isn't running or the job isn't registered."""
+    try:
+        job = scheduler.get_job(UPDATE_CHECK_JOB_ID)
+    except Exception:
+        return None
+    return job.next_run_time if job else None
 
 
 def stop_scheduler() -> None:

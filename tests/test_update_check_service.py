@@ -25,9 +25,9 @@ def test_github_api_url_targets_backend_repo():
 
 
 @pytest.mark.asyncio
-async def test_get_github_latest_version_queries_correct_repo_url():
-    """The HTTP call made to fetch the latest release must hit the backend repo's
-    releases endpoint, not the old monorepo's."""
+async def test_get_github_latest_version_queries_split_repo_urls():
+    """The release fetch must hit the split repos' releases endpoints (backend
+    and frontend), not the old monorepo's."""
     _version_cache["latest_version"] = None
     _version_cache["cached_at"] = None
 
@@ -46,8 +46,10 @@ async def test_get_github_latest_version_queries_correct_repo_url():
     ):
         version = await _get_github_latest_version(force=True)
 
-    mock_client.get.assert_called_once_with(GITHUB_API_URL)
-    assert "chores-web-backend" in mock_client.get.call_args[0][0]
+    called_urls = [call.args[0] for call in mock_client.get.call_args_list]
+    assert GITHUB_API_URL in called_urls
+    assert any("chores-web-backend" in u for u in called_urls)
+    assert any("chores-web-frontend" in u for u in called_urls)
     assert version == "9.9.9"
 
 

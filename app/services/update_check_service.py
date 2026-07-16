@@ -10,8 +10,49 @@ from ..config import APP_VERSION
 
 logger = logging.getLogger(__name__)
 
-# GitHub API endpoint for releases
-GITHUB_API_URL = "https://api.github.com/repos/derekwinters/chores-web-backend/releases/latest"
+# GitHub API endpoints for releases.
+#
+# Post-split, "latest version" is resolved across the split release locations
+# (chores-web-backend and chores-web-frontend), NOT the old monorepo
+# (derekwinters/chores-web). GITHUB_API_URL is kept as the backend source of
+# record; RELEASE_SOURCES enumerates every repo whose latest release counts.
+BACKEND_API_URL = "https://api.github.com/repos/derekwinters/chores-web-backend/releases/latest"
+FRONTEND_API_URL = "https://api.github.com/repos/derekwinters/chores-web-frontend/releases/latest"
+
+# Backwards-compatible alias for the backend's own release source.
+GITHUB_API_URL = BACKEND_API_URL
+
+RELEASE_SOURCES = {
+    "backend": BACKEND_API_URL,
+    "frontend": FRONTEND_API_URL,
+}
+
+
+def _parse_version(value: Optional[str]):
+    """Parse a dotted semver-ish string into a comparable tuple, or None."""
+    if not value:
+        return None
+    try:
+        return tuple(int(part) for part in value.split("."))
+    except (ValueError, AttributeError):
+        return None
+
+
+def _max_version(versions) -> Optional[str]:
+    """Return the highest semver string among ``versions``.
+
+    Unparseable or empty entries are ignored. Returns None when nothing is
+    parseable (e.g. every release fetch failed)."""
+    best: Optional[str] = None
+    best_key = None
+    for version in versions:
+        key = _parse_version(version)
+        if key is None:
+            continue
+        if best_key is None or key > best_key:
+            best_key = key
+            best = version
+    return best
 
 # In-memory cache for version info
 _version_cache = {
@@ -21,8 +62,34 @@ _version_cache = {
 }
 
 
+async def _fetch_release_tag(client: httpx.AsyncClient, name: str, url: str) -> Optional[str]:
+    """Fetch a single repo's latest release tag (stripped of a leading 'v').
+
+    Failures (timeout, non-200, network error) are logged and return None so a
+    single unreachable source can't sink resolution of the others."""
+    try:
+        response = await client.get(url)
+        if response.status_code == 200:
+            tag_name = response.json().get("tag_name", "").lstrip("v") or None
+            if tag_name:
+                logger.info(f"Fetched latest {name} version from GitHub: {tag_name}")
+            return tag_name
+        logger.warning(f"GitHub API returned status {response.status_code} for {name}")
+        return None
+    except httpx.TimeoutException:
+        logger.warning(f"GitHub API request timed out for {name}")
+        return None
+    except Exception as e:
+        logger.error(f"Unexpected error fetching GitHub version for {name}: {e}")
+        return None
+
+
 async def _get_github_latest_version(timeout: int = 5, force: bool = False) -> Optional[str]:
-    """Fetch the latest release version from GitHub API with caching."""
+    """Resolve the latest release version across the split repos, with caching.
+
+    Queries every entry in RELEASE_SOURCES (backend + frontend) and returns the
+    highest semver found, so the reported "latest version" reflects the newest
+    release of the split project rather than one repo in isolation."""
     now = datetime.utcnow()
 
     # Check if cache is still valid (bypassed when force=True)
@@ -35,25 +102,24 @@ async def _get_github_latest_version(timeout: int = 5, force: bool = False) -> O
         logger.debug("Using cached version info")
         return _version_cache["latest_version"]
 
+    tags = []
     try:
         async with httpx.AsyncClient(timeout=timeout) as client:
-            response = await client.get(GITHUB_API_URL)
-            if response.status_code == 200:
-                data = response.json()
-                tag_name = data.get("tag_name", "").lstrip("v")
-                _version_cache["latest_version"] = tag_name
-                _version_cache["cached_at"] = now
-                logger.info(f"Fetched latest version from GitHub: {tag_name}")
-                return tag_name
-            else:
-                logger.warning(f"GitHub API returned status {response.status_code}")
-                return None
-    except httpx.TimeoutException:
-        logger.warning("GitHub API request timed out")
-        return None
+            for name, url in RELEASE_SOURCES.items():
+                tag = await _fetch_release_tag(client, name, url)
+                if tag:
+                    tags.append(tag)
     except Exception as e:
-        logger.error(f"Unexpected error fetching GitHub version: {e}")
+        logger.error(f"Unexpected error creating GitHub client: {e}")
         return None
+
+    latest = _max_version(tags)
+    # Only refresh the cache on a successful resolution; a total failure leaves
+    # the previous (possibly None) value untouched rather than caching a miss.
+    if latest is not None:
+        _version_cache["latest_version"] = latest
+        _version_cache["cached_at"] = now
+    return latest
 
 
 async def check_for_updates(db: AsyncSession, force: bool = False) -> Optional[str]:
@@ -134,6 +200,16 @@ async def get_update_status(db: AsyncSession) -> dict:
             # If version parsing fails, do simple string comparison
             update_available = update_check.latest_version != update_check.current_version
 
+    # Surface the scheduler's next planned run so the interval is observable
+    # alongside last_checked_at. Imported lazily to avoid a circular import
+    # (scheduler imports check_for_updates from this module).
+    try:
+        from .scheduler import get_update_check_next_run
+
+        next_scheduled_run = get_update_check_next_run()
+    except Exception:
+        next_scheduled_run = None
+
     return {
         "current_version": APP_VERSION,
         "latest_version": update_check.latest_version,
@@ -141,6 +217,7 @@ async def get_update_status(db: AsyncSession) -> dict:
         "check_enabled": update_check.check_enabled,
         "check_interval_hours": update_check.check_interval_hours,
         "update_available": update_available,
+        "next_scheduled_run": next_scheduled_run,
     }
 
 
