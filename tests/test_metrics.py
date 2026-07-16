@@ -10,9 +10,9 @@ async def test_prometheus_client_importable():
 
 
 @pytest.mark.asyncio
-async def test_starlette_prometheus_importable():
-    """starlette_prometheus must be installed as a dependency."""
-    import starlette_prometheus  # noqa: F401
+async def test_prometheus_fastapi_instrumentator_importable():
+    """prometheus_fastapi_instrumentator must be installed as a dependency."""
+    import prometheus_fastapi_instrumentator  # noqa: F401
 
 
 @pytest.mark.asyncio
@@ -163,10 +163,11 @@ async def test_chore_completions_by_person_has_window_labels(client: AsyncClient
 
 @pytest.mark.asyncio
 async def test_http_request_metrics_present(client: AsyncClient):
-    """starlette_prometheus middleware injects HTTP request count metrics."""
+    """prometheus-fastapi-instrumentator injects HTTP request count metrics."""
     # Make a request first so metrics get populated
     await client.get("/health")
     response = await client.get("/metrics")
     assert response.status_code == 200
-    # starlette-prometheus registers starlette_requests_total
-    assert b"starlette_requests" in response.content
+    # prometheus-fastapi-instrumentator registers http_requests_total
+    # (replacing starlette-prometheus's starlette_requests_total).
+    assert b"http_requests_total" in response.content

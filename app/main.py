@@ -5,8 +5,8 @@ from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from prometheus_fastapi_instrumentator import Instrumentator
 from sqlalchemy.ext.asyncio import AsyncSession
-from starlette_prometheus import PrometheusMiddleware
 
 from .database import engine, get_db
 from .models import Base
@@ -61,7 +61,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-app.add_middleware(PrometheusMiddleware)
+# HTTP request metrics via prometheus-fastapi-instrumentator (actively
+# maintained, FastAPI-native). It registers its metrics on prometheus_client's
+# default REGISTRY, so the existing GET /metrics endpoint (app/routers/metrics.py),
+# which calls generate_latest() on that registry, serves them alongside the
+# hand-rolled application gauges. We instrument only (no .expose()) — the
+# metrics router owns the /metrics endpoint.
+Instrumentator().instrument(app)
 
 
 @app.exception_handler(Exception)

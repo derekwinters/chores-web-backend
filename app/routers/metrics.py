@@ -3,7 +3,9 @@
 Exposes application metrics at GET /metrics in Prometheus text format.
 Public endpoint — no authentication required.
 Process metrics (CPU, memory, file descriptors) and HTTP request metrics
-are provided automatically by prometheus_client and starlette_prometheus.
+are provided automatically by prometheus_client and
+prometheus-fastapi-instrumentator (wired up in app/main.py); this router
+renders them together with the hand-rolled application gauges below.
 """
 from datetime import date, timedelta, timezone, datetime
 

@@ -23,13 +23,6 @@ updates:
       python-dependencies:
         patterns:
           - "*"
-    ignore:
-      # 0.137+ wraps included routers in _IncludedRouter, which breaks
-      # starlette-prometheus (unmaintained — assumes route.path on every
-      # matched route). Lift this once starlette-prometheus is replaced
-      # or fixed upstream.
-      - dependency-name: "fastapi"
-        versions: [">=0.137.0"]
     commit-message:
       prefix: build
       include: scope
