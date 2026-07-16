@@ -507,6 +507,10 @@ class UpdateCheckStatus(BaseModel):
     current_version: str
     latest_version: Optional[str] = None
     last_checked_at: Optional[datetime] = None
+    # Next planned run of the periodic update-check job, so the configured
+    # interval is observable alongside last_checked_at. Null when the scheduler
+    # isn't running (e.g. under tests).
+    next_scheduled_run: Optional[datetime] = None
     check_enabled: bool
     check_interval_hours: int
     update_available: bool = False
