@@ -335,6 +335,65 @@ class TestCompleteChore:
         result = await complete_chore(chore, db)
         assert result.current_assignee is None
 
+    @pytest.mark.asyncio
+    async def test_zero_point_chore_writes_no_points_log(self, db):
+        # A zero-point chore is a simple task reminder: completing it earns no
+        # Credit, so no Points Log entry is written (decision documented in CONTEXT.md).
+        chore = _make_chore(
+            state="due", points=0,
+            schedule_type="interval", schedule_config={"days": 7},
+        )
+        db.add(chore)
+        await db.commit()
+        await db.refresh(chore)
+
+        await complete_chore(chore, db, completed_by="Alice")
+
+        logs = (await db.execute(select(PointsLog))).scalars().all()
+        assert len(logs) == 0
+
+    @pytest.mark.asyncio
+    async def test_zero_point_chore_does_not_change_person_points(self, db):
+        from app.models import Person
+
+        person = Person(name="Alice", username="alice", password_hash="x", points=0)
+        db.add(person)
+        chore = _make_chore(
+            state="due", points=0,
+            schedule_type="interval", schedule_config={"days": 7},
+        )
+        db.add(chore)
+        await db.commit()
+        await db.refresh(chore)
+
+        await complete_chore(chore, db, completed_by="alice")
+
+        refreshed = (
+            await db.execute(select(Person).where(Person.username == "alice"))
+        ).scalar_one()
+        assert refreshed.points == 0
+
+    @pytest.mark.asyncio
+    async def test_zero_point_chore_completes_cleanly(self, db):
+        # Completion still advances the schedule and logs the completion.
+        chore = _make_chore(
+            state="due", points=0,
+            schedule_type="interval", schedule_config={"days": 7},
+        )
+        db.add(chore)
+        await db.commit()
+        await db.refresh(chore)
+
+        result = await complete_chore(chore, db, completed_by="Alice")
+        assert result.state == "complete"
+        assert result.last_change_type == "completed"
+        assert result.next_due is not None
+
+        log = (
+            await db.execute(select(ChoreLog).where(ChoreLog.action == "completed"))
+        ).scalar_one()
+        assert log.chore_id == chore.id
+
 
 class TestSkipChore:
     @pytest.mark.asyncio
