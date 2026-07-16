@@ -349,6 +349,34 @@ class PointsLogOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class PointAwardCreate(BaseModel):
+    """Request body for a one-time admin point award (a Credit not tied to a Chore)."""
+    person: str
+    points: int
+    reason: str
+
+    @field_validator("person")
+    @classmethod
+    def validate_person(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("person is required")
+        return v.strip()
+
+    @field_validator("reason")
+    @classmethod
+    def validate_reason(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("reason is required")
+        return v.strip()
+
+    @field_validator("points")
+    @classmethod
+    def validate_points(cls, v: int) -> int:
+        if v <= 0:
+            raise ValueError("points must be positive")
+        return v
+
+
 class RedemptionLogOut(BaseModel):
     id: int
     person_id: int
