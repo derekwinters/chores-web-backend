@@ -33,7 +33,9 @@ Changing the Assignee of a due (not yet completed) Chore. Does not affect the Po
 _Avoid_: Transfer (when referring to a pre-completion assignee change)
 
 **Points Log**:
-Append-only record of all Credits. One entry per Completion.
+Append-only record of all Credits. One entry per Completion **that awards
+points** — a Completion of a zero-point Chore writes no Points Log entry (see
+"Zero-point Chores" below).
 _Avoid_: Score log, history
 
 **Activity Log**:
@@ -60,9 +62,28 @@ _Avoid_: Delete, clear, expire
 A person's per-type opt-out from Notifications. An absent row means enabled; a row exists only to record an explicit choice, and generation skips a person only when a row exists with `enabled = false` for that type.
 _Avoid_: Setting, subscription, mute
 
+## Zero-point Chores
+
+A Chore may have a point value of `0`, which turns it into a simple task
+reminder: it still schedules, becomes due, is assigned, and is completed like
+any other Chore, but completing it earns no points.
+
+- **Validation**: chore create/update accepts `points = 0`. Only negative
+  values are rejected (`points must be non-negative`).
+- **Completion — no Points Log entry**: completing a zero-point Chore writes
+  **no** Points Log entry and does not change any person's point total. A
+  Credit is the attribution of *points*; with zero points there is nothing to
+  credit, so no entry is created. This keeps every Points Log row meaningful
+  (each represents points actually earned) and is consistent with one-time
+  point Awards, which require a positive amount. The Completion is still
+  recorded in the Activity Log with action `completed`, and the schedule
+  advances normally.
+
 ## Relationships
 
-- A **Chore** produces one **Points Log** entry per **Completion**
+- A **Chore** produces one **Points Log** entry per **Completion** that awards
+  a non-zero number of points (a zero-point **Completion** produces no Points
+  Log entry — see "Zero-point Chores")
 - A **Completion** produces one **Activity Log** entry with action `completed`
 - An **Amendment** appends one **Activity Log** entry with action `amended` without modifying the original `completed` entry
 - A **Reassignment** applies only to due Chores and never touches the **Points Log**

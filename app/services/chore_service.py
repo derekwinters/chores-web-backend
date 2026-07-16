@@ -273,6 +273,10 @@ async def complete_chore(
     # Capture the assignee before any reassignment logic runs
     chore_assignee = chore.current_assignee
 
+    # Zero-point chores are simple task reminders: completing one earns no Credit,
+    # so no Points Log entry is written (see CONTEXT.md, "Points Log"). The guard is
+    # `points > 0`, not `points is not None` — negative values are rejected upstream
+    # by schema validation, and 0 means "nothing to credit".
     if chore.points > 0 and completed_by:
         log = PointsLog(
             person=completed_by,

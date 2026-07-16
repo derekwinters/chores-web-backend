@@ -273,6 +273,52 @@ class TestChoresAPI:
         assert r.json()["points"] == 10
 
     @pytest.mark.asyncio
+    async def test_create_zero_point_chore(self, authenticated_client):
+        # Zero-point chores act as simple task reminders.
+        r = await authenticated_client.post(
+            "/v1/chores", json={**WEEKLY_CHORE, "points": 0}
+        )
+        assert r.status_code == 201
+        assert r.json()["points"] == 0
+
+    @pytest.mark.asyncio
+    async def test_update_chore_to_zero_points(self, authenticated_client):
+        create_r = await authenticated_client.post("/v1/chores", json=WEEKLY_CHORE)
+        chore_id = create_r.json()["id"]
+        r = await authenticated_client.put(f"/v1/chores/{chore_id}", json={"points": 0})
+        assert r.status_code == 200
+        assert r.json()["points"] == 0
+
+    @pytest.mark.asyncio
+    async def test_create_negative_point_chore_rejected(self, authenticated_client):
+        r = await authenticated_client.post(
+            "/v1/chores", json={**WEEKLY_CHORE, "points": -1}
+        )
+        assert r.status_code == 422
+
+    @pytest.mark.asyncio
+    async def test_update_chore_to_negative_points_rejected(self, authenticated_client):
+        create_r = await authenticated_client.post("/v1/chores", json=WEEKLY_CHORE)
+        chore_id = create_r.json()["id"]
+        r = await authenticated_client.put(f"/v1/chores/{chore_id}", json={"points": -1})
+        assert r.status_code == 422
+
+    @pytest.mark.asyncio
+    async def test_complete_zero_point_chore_writes_no_points_log(self, authenticated_client):
+        create_r = await authenticated_client.post(
+            "/v1/chores", json={**WEEKLY_CHORE, "points": 0}
+        )
+        chore_id = create_r.json()["id"]
+
+        r = await authenticated_client.post(f"/v1/chores/{chore_id}/complete", json={})
+        assert r.status_code == 200
+
+        # Completer earns no Credit; their points stay at 0.
+        people = (await authenticated_client.get("/v1/people")).json()
+        testuser = next(p for p in people if p["username"] == "testuser")
+        assert testuser["points"] == 0
+
+    @pytest.mark.asyncio
     async def test_update_fixed_assignee_updates_current_assignee(self, authenticated_client):
         await authenticated_client.post("/v1/people", json={"name": "Alice", "username": "alice"})
         await authenticated_client.post("/v1/people", json={"name": "Bob", "username": "bob"})
