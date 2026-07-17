@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.5.0](https://github.com/derekwinters/chores-web-backend/compare/v2.4.0...v2.5.0) (2026-07-16)
+
+
+### Features
+
+* add admin endpoint for one-time point awards ([#44](https://github.com/derekwinters/chores-web-backend/issues/44)) ([f3055de](https://github.com/derekwinters/chores-web-backend/commit/f3055de0a5f6443a9c0585ed26f58ec057533742))
+* allow zero-point chores as task reminders ([#46](https://github.com/derekwinters/chores-web-backend/issues/46)) ([8bbb686](https://github.com/derekwinters/chores-web-backend/commit/8bbb686489da93d3c9fedaf041d926909643841b))
+* expose backend and API version on /status/ ([#47](https://github.com/derekwinters/chores-web-backend/issues/47)) ([c9f87c7](https://github.com/derekwinters/chores-web-backend/commit/c9f87c71edc97a816291c4647807808193572bb7))
+
+
+### Bug Fixes
+
+* make update check fire reliably and target split release repos ([#51](https://github.com/derekwinters/chores-web-backend/issues/51)) ([79e0476](https://github.com/derekwinters/chores-web-backend/commit/79e0476b2915e4a9c0e5483bff939f3d4c53e359))
+* replace starlette-prometheus with prometheus-fastapi-instrumentator ([#48](https://github.com/derekwinters/chores-web-backend/issues/48)) ([8afe0aa](https://github.com/derekwinters/chores-web-backend/commit/8afe0aa57b94d2e98411dfb4945fed399eba020c))
+
 ## [2.4.0](https://github.com/derekwinters/chores-web-backend/compare/v2.3.0...v2.4.0) (2026-07-14)
 
 
