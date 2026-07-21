@@ -1,11 +1,12 @@
 ---
 name: implementation-verify
-description: Verify the backend test suite and API contract, then show changes summary for user review
+description: Build/verify the change and show a changes summary for user review, then pause.
 ---
 
 # Implementation Verify Skill
 
-Runs the test suite and the API-contract check to verify the change is sound, then shows a summary of changes for user review.
+Runs the repo's verification, then shows a summary of changes for user review.
+This is the human control point before commit.
 
 ## Usage
 
@@ -15,40 +16,25 @@ Runs the test suite and the API-contract check to verify the change is sound, th
 
 ## Workflow
 
-1. **Run tests**: `pytest` (config in `pytest.ini`: `asyncio_mode = auto`, `testpaths = tests`)
-2. **Regenerate the OpenAPI schema and check for contract drift**:
-   - `python scripts/generate_openapi.py --output <tmp>/openapi.json`
-   - Diff `<tmp>/openapi.json` against the golden snapshot in the `chores-web-docs` clone (`docs/api/openapi.json`).
-   - If they differ, flag it: a change to the live schema means the contract in `chores-web-docs` must be updated (and, for breaking changes, `API_VERSION` incremented) — see CLAUDE.md's Breaking Change Ritual. Report the drift so the user can decide.
-3. **Alembic-migration reminder**: if this change touched `app/models.py`, confirm a matching migration exists in `alembic/versions/` (`python -m alembic revision --autogenerate -m "..."` — see `MIGRATIONS.md`). A model change with no new revision is a defect — flag it.
-4. **Verify success**: Check exit codes, report any test failures or contract drift.
-5. **Prepare changes summary**:
-   - List all files modified
-   - Show line change counts
-   - Summarize implementation
-   - Display test results
-6. **Pause workflow**: Wait for user approval or request for changes
+1. **Verify:** `pytest` — must succeed. It must NEVER
+   silently pass; report the real result.
+- **API contract:** regenerate the schema
+  (`python scripts/generate_openapi.py --output <tmp>/openapi.json`) and diff it
+  against the `chores-web-docs` golden snapshot (`docs/api/openapi.json`). On
+  drift, flag it: the golden snapshot must be updated (and `API_VERSION` bumped
+  for breaking changes) — see CLAUDE.md's Breaking Change Ritual.
+- **Migrations:** if `app/models.py` changed, confirm a matching revision exists
+  in `alembic/versions/`. A model change with no revision is a defect — flag it.
+
+2. **Prepare a changes summary:** `git diff --stat`; list files modified with
+   line counts; summarize the implementation; include the test/verify results.
+3. **Pause:** wait for the user to Approve for commit / Request changes / Abort.
 
 ## Parameters
 
-- `issue_number` (optional): For reference in output
-
-## Output
-
-Shows:
-- Files modified with line counts
-- Implementation summary
-- Test results
-- API contract status (in sync / drift detected)
-- Migration status (if `app/models.py` changed)
-- Ready for user to:
-  - Approve for commit
-  - Request more changes
-  - Abort
+- `issue_number` (optional): for reference in the output.
 
 ## Notes
 
-- Called by orchestrator after tests pass
-- Contract check confirms the live schema still matches the published golden snapshot
-- Shows all changes before user reviews
-- User has control point here
+- Called by the orchestrator after tests pass.
+- Shows all changes before the user reviews; the user has the control point here.

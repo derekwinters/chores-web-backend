@@ -1,0 +1,37 @@
+{
+  "source": "derekwinters/ai-skills",
+  "ref": "main",
+  "bundles": [
+    "core",
+    "lifecycle",
+    "triage"
+  ],
+  "skills": [
+    "ci-watch",
+    "commit",
+    "implementation-validate",
+    "implementation-prepare",
+    "implementation-test",
+    "implementation-verify",
+    "implementation-finalize",
+    "github-issue-categorize",
+    "github-issue-find-duplicates",
+    "github-issue-validate-bug",
+    "github-issue-validate-feature",
+    "github-issue-validate-refactor",
+    "github-issue-completeness",
+    "github-issue-label",
+    "github-issue-suggest-milestone",
+    "github-issue-review",
+    "grill-with-docs"
+  ],
+  "agents": [
+    "dev",
+    "github-issue-triage-orchestrator",
+    "github-issue-implementation-orchestrator",
+    "milestone-implementation-orchestrator"
+  ],
+  "workflows": [
+    "skills-update.yml"
+  ]
+}

@@ -1,62 +1,66 @@
 ---
 name: github-issue-review
-description: Review GitHub issue content for completeness and add ready-to-grill label
+description: Review GitHub issue content for completeness, clarify missing sections in place, and apply the ready-to-grill label when the issue is complete.
 ---
 
-# GitHub Issue Review
+<what-to-do>
 
-Reviews GitHub issue content for completeness, updates description/acceptance criteria as needed, and labels as `ready-to-grill` when complete.
-
-## Usage
+## Invocation
 
 ```
 /github-issue-review <issue-number>
 ```
 
-## Workflow
+Reviews a GitHub issue for completeness, updates its description/acceptance criteria as needed, and labels it `ready-to-grill` when complete.
 
-1. **Fetch issue**: Get issue details from GitHub
-2. **Check status**: Skip if `ready-to-grill` or `ready-for-work` labels exist
-3. **Review completeness**: Validate issue has:
-   - Clear title
-   - Detailed description of problem/feature
-   - Acceptance criteria or requirements
-   - Any relevant context or examples
-4. **Update if needed**: Edit issue to add missing sections
-5. **Add label**: Apply `ready-to-grill` label when complete
+## Step 1: Fetch and check status
 
-## Completeness Checklist
+- Fetch the issue: `gh issue view <number>`.
+- Extract its labels.
+- If the issue already has `ready-to-grill` OR `ready-for-work`, STOP and inform the user: "Issue already labeled, skipping review."
+- Otherwise continue.
 
-Issue must have:
-- **Title**: Clear, specific description of work
-- **Description**: Problem statement or feature overview (2+ sentences)
-- **Acceptance Criteria**: What constitutes done (3+ items or equivalent detail)
-- **Context**: Environment, examples, related issues, or additional details
+## Step 2: Review completeness
 
-## Automatic Updates
+Assess whether the issue has these elements:
 
-If issue is incomplete, add/update:
-- Acceptance Criteria section if missing
-- Examples or test cases if vague
-- Environment/setup details if needed
-- Links to related issues
+- **Title** — clear and specific (not vague like "Bug" or "Fix something").
+- **Description** — explains the problem/feature, at least 2-3 sentences of context, covering the "what" and the "why".
+- **Acceptance criteria** — specific requirements or a definition of done; at least 3 criteria (or equivalent detail), each testable/verifiable.
+- **Context/examples** (helpful but not strictly required) — environment details, reproduction steps or code examples, related issues.
+
+## Step 3: Identify gaps
+
+Determine what is missing: unclear title, insufficient description, no/weak acceptance criteria, vague requirements, missing examples or context.
+
+## Step 4: Update the issue (if needed)
+
+If gaps are found, update the issue body: `gh issue edit <number> --body "<new-body>"`.
+
+- Add an `## Acceptance Criteria` section if missing.
+- Clarify vague requirements; add examples or test cases.
+- Link related issues; add implementation hints if helpful.
+- Keep the original content — only add or clarify missing sections, never remove information.
+
+## Step 5: Add label
+
+- Apply the label: `gh issue edit <number> --add-label ready-to-grill`.
+- Confirm the label was added.
+
+## Step 6: Summary
+
+Report the issue number and title, what was reviewed/updated, and confirmation that the `ready-to-grill` label was added.
+
+## Rules
+
+- Do NOT modify the issue if `ready-to-grill` or `ready-for-work` is already present.
+- Preserve the submitter's original intent and language; be respectful.
+- Only add or clarify — do not remove information.
+- Focus on completeness, not style. Some issues need no updates (already complete). Be conservative with changes; ask before major rewrites.
 
 ## Labels
 
-- **ready-to-grill**: Issue is complete and ready for implementation planning
-- **ready-for-work**: Issue already planned, skip this workflow
-- **ready-to-grill**: Already present, skip this workflow
+- **ready-to-grill** — issue is complete and ready for the grilling / planning stage (applied by this skill).
+- **ready-for-work** — issue already planned; skip this workflow.
 
-## Examples
-
-```
-/github-issue-review 42
-```
-Reviews issue #42, updates if needed, adds ready-to-grill label
-
-## Notes
-
-- Don't modify if issue already labeled `ready-to-grill` or `ready-for-work`
-- Preserve original intent while clarifying
-- Be respectful of submitter's words
-- Link related issues when helpful
+</what-to-do>
