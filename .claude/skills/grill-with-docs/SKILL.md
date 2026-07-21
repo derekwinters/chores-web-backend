@@ -26,15 +26,13 @@ If a question can be answered by exploring the codebase, explore the codebase in
 
 ## Area Checklist
 
-Every grilling session MUST explicitly cover all five areas. Work through them as part of the conversation, not just in the output:
+Every grilling session MUST explicitly cover all of this repo's impact areas. Work through each one as part of the conversation, not just in the output:
 
-- [ ] **Backend** — FastAPI routers, endpoints, services, business logic, request/response schemas
-- [ ] **Database/Migrations** — `app/models.py` changes and the matching Alembic revision in `alembic/versions/` (see `MIGRATIONS.md`)
-- [ ] **API Contract** — changes to the live OpenAPI schema and whether they drift from the golden snapshot in `chores-web-docs` (`docs/api/openapi.json`); breaking changes require the Breaking Change Ritual (bump `API_VERSION`, update the golden snapshot) — see CLAUDE.md
-- [ ] **Scheduler** — background jobs and scheduled tasks
-- [ ] **Docs** — README, architecture docs, CONTEXT.md, ADRs, any other affected docs
+**Impact areas:** api, db, auth, scheduler, services, build
 
-If an area has no changes, state that explicitly ("Scheduler: no changes needed") so it's clear it was considered, not skipped.
+Treat each listed area as a checklist item, and consult this repo's `CLAUDE.md` for what that area entails and any rituals it carries (migrations, API-contract drift, versioning, etc.). Always include a **docs** review — README, architecture docs, `CONTEXT.md`, ADRs, and any other affected docs — even if it is not listed above.
+
+If an area has no changes, state that explicitly (e.g. "scheduler: no changes needed") so it's clear it was considered, not skipped.
 
 </what-to-do>
 
@@ -125,11 +123,7 @@ After the session is complete and the user confirms the decisions are captured, 
 ### Impact Areas
 | Area | Changes | Notes |
 |------|---------|-------|
-| Backend | ... | ... |
-| Database/Migrations | ... | ... |
-| API Contract | ... | ... |
-| Scheduler | ... | ... |
-| Docs | ... | ... |
+| <one row per impact area for this repo: api, db, auth, scheduler, services, build, plus Docs> | ... | ... |
 
 ### Behaviors to Implement
 - [ ] Behavior 1 (area: Backend)
