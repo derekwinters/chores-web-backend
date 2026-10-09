@@ -106,3 +106,5 @@ This still leaves the orchestrating session responsible for the
 squash-merge title at merge time: it must apply the Conventional Commits
 rule above to whichever title it chooses, and copying the PR's title
 verbatim is only correct when that title is already conventional.
+
+@.ai-sdlc/house-rules.md
