@@ -1,7 +1,7 @@
 from pydantic_settings import BaseSettings
 
 # Current application version
-APP_VERSION = "2.5.0"  # x-release-please-version
+APP_VERSION = "2.6.0"  # x-release-please-version
 
 # Current API major version. The versioned API surface is mounted under
 # `/v1` (see V1_PREFIX in app/main.py); this is the corresponding negotiable
