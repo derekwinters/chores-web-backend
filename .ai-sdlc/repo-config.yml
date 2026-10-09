@@ -1,0 +1,23 @@
+# ai-sdlc configuration for chores-web-backend.
+# Schema: https://github.com/derekwinters/ai-sdlc/blob/main/docs/spec/configuration.md
+# This file is owned by this repository; ai-sdlc's adopt only reads it
+# (and seeds the skills: list once if absent).
+
+capabilities:
+  - hygiene
+  - release
+
+commands:
+  test: pytest
+
+# Which ai-sdlc skills this repository installs. `skills-update` opens a
+# pull request when one of them changes upstream, and a name removed here
+# is uninstalled on the next run.
+#
+# Seeded once by `adopt` from the capabilities above, and never touched
+# again: this list is yours. Add to it, prune it, or set it to `[]` to
+# install none — whatever is here is what a later adoption will honour.
+skills:
+  - github-api
+  - routines
+  - release-flow
