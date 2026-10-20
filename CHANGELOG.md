@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.6.0](https://github.com/derekwinters/chores-web-backend/compare/v2.5.0...v2.6.0) (2026-10-09)
+
+
+### Features
+
+* **ai:** adopt shared ai-skills bundles (self-updater, shared skills, dev agent) ([#57](https://github.com/derekwinters/chores-web-backend/issues/57)) ([ff9f4e8](https://github.com/derekwinters/chores-web-backend/commit/ff9f4e8d075b281fcaae81be7a3bdddf90c9c963))
+
+
+### CI/CD
+
+* **deps:** bump the github-actions group with 3 updates ([#60](https://github.com/derekwinters/chores-web-backend/issues/60)) ([6aeb463](https://github.com/derekwinters/chores-web-backend/commit/6aeb46376bcbc8ffcbc4f998207df7a8112d8f64))
+
 ## [2.5.0](https://github.com/derekwinters/chores-web-backend/compare/v2.4.0...v2.5.0) (2026-07-16)
 
 
